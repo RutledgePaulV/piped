@@ -1,6 +1,7 @@
 (ns piped.support
   (:require [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds])
+            [cognitect.aws.credentials :as creds]
+            [clojure.pprint :as pprint])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
            (java.time Duration)))
@@ -10,11 +11,10 @@
     (let [container (GenericContainer. "localstack/localstack:0.10.9")]
       (doto container
         (.setExposedPorts [(int 4576)])
-        (.setEnv [(str "HOSTNAME_EXTERNAL=" (.getContainerIpAddress container))])
+        (.setEnv ["SERVICES=sqs" (str "HOSTNAME_EXTERNAL=" (.getContainerIpAddress container))])
         (.withStartupTimeout (Duration/ofMinutes 1))
         (.waitingFor (Wait/forLogMessage "^Ready\\.\\s*$" 1))
         (.start))
-      (println "Localstack started.")
       container)))
 
 (defn localstack-client [client-opts]
@@ -28,4 +28,5 @@
            {:protocol :http
             :hostname (.getContainerIpAddress @localstack)
             :port     (.getMappedPort @localstack 4576)}}]
+      (pprint/pprint localstack-opts)
       (aws/client (merge client-opts localstack-opts)))))
