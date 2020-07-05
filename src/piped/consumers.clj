@@ -1,9 +1,11 @@
 (ns piped.consumers
   "Code relating to reading SQS messages from channels and processing them."
   (:require [clojure.core.async :as async]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [piped.sqs :as sqs]))
 
-(defn spawn-consumer* [client producer-chan message-fn]
+
+(defn- spawn-consumer* [client producer-chan message-fn]
   (async/go-loop [msg (async/<! producer-chan)]
     (when (some? msg)
       (let [deadline-chan (-> msg meta :deadline)
@@ -17,7 +19,7 @@
           :nack ()
           :extend ())))))
 
-(defn ->processor
+(defn- ->processor
   "Turns a function with unknown behavior into a predictable
    function with well-defined return values and no exceptions."
   [processor-fn]

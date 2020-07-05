@@ -1,7 +1,6 @@
 (ns piped.core
   "The public API."
-  (:require [cognitect.aws.client.api :as aws]
-            [clojure.core.async :as async]
+  (:require [clojure.core.async :as async]
             [piped.consumers :as consumers]
             [piped.producers :as producers]))
 
@@ -23,21 +22,28 @@
   "Spawns a set of producers and consumers for a given queue.
 
    Returns a function of no arguments that can be called to stop the system."
-  ([queue-url consumer-fn]
-   (spawn-system queue-url consumer-fn {}))
-  ([queue-url consumer-fn
-    {:keys [client blocking producer-n consumer-n pipe]
+  ([client queue-url consumer-fn]
+   (spawn-system client queue-url consumer-fn {}))
+  ([client queue-url consumer-fn
+    {:keys [blocking producer-n consumer-n pipe]
      :or   {producer-n 1
             consumer-n 1
             blocking   true
-            pipe       (async/chan 10)}
-     :as   options}]
-   (dotimes [_ producer-n]
-     (producers/spawn-producer client queue-url pipe))
-   (dotimes [_ consumer-n]
-     (if-not blocking
-       (consumers/spawn-consumer-compute client pipe consumer-fn)
-       (consumers/spawn-consumer-blocking client pipe consumer-fn)))
-   (fn [] (async/close! pipe))))
+            pipe       (async/chan 10)}}]
+   (letfn [(spawn-producer []
+             (producers/spawn-producer client queue-url pipe))
+           (spawn-consumer []
+             (if-not blocking
+               (consumers/spawn-consumer-compute client pipe consumer-fn)
+               (consumers/spawn-consumer-blocking client pipe consumer-fn)))]
+     (let [producers (doall (repeatedly producer-n spawn-producer))
+           consumers (doall (repeatedly consumer-n spawn-consumer))]
+       (fn []
+         ; stop the flow of data from producers to consumers
+         (async/close! pipe)
+         ; wait for producers to exit
+         (run! async/<!! producers)
+         ; wait for consumers to exit
+         (run! async/<!! consumers))))))
 
 

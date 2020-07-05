@@ -22,10 +22,10 @@ short and long polling based on the throughput and backpressure of your system.
 
 These read SQS messages from a channel and hand them to your message processing function. Consumers 
 then supervise the message processing in order to extend visibility timeouts, trip circuits, 
-nack failed messages, and ack messages that were processed successfully. Blocking consumers run 
-your processing function on a dedicated thread and should be used for blocking-io. Regular consumers 
+nack failed messages, and ack messages that were processed successfully. Compute consumers 
 run your processing function on one of the go-block dispatch threads and should only be used for 
-cpu-bound tasks. Blocking consumers are the default when you create a system.
+cpu-bound tasks. Blocking consumers run your processing function on a dedicated thread and should 
+be used for blocking-io. Blocking consumers are the default when you create a system.
 
 #### Message Processing Function
 
@@ -51,6 +51,7 @@ A set of producers, consumers, and a pipe.
 
 ```clojure 
 
+(require '[cognitect.aws.client.api :as aws])
 (require '[piped.core :as piped])
 (require '[clojure.edn :as edn])
 
@@ -72,14 +73,16 @@ A set of producers, consumers, and a pipe.
 
 (def queue-url "https://queue.amazonaws.com/80398EXAMPLE/MyQueue")
 
-; this would use the default aws credential chain
-; but you can pass your own client instance in the options
-(def stop-system (piped/spawn-system queue-url processor {:pipe pipe}))
+(def client (aws/client {:api :sqs}))
+
+(def stop-callback (piped/spawn-system client queue-url processor {:pipe pipe}))
 
 ; ... some time later
 
-; stop polling! this is graceful and will await any items still in the pipe
-(stop-system)
+; stop the system!
+; this will nack any messages that have been received but not yet put into the pipe
+; and will wait for consumers to finish processing messages that are already in the pipe
+(stop-callback)
 
 ```
 

@@ -3,8 +3,10 @@
   (:require [piped.utils :as utils]
             [piped.sqs :as sqs]
             [clojure.core.async :as async]
-            [cognitect.aws.client.api :as aws]))
+            [cognitect.aws.client.api :as aws]
+            [clojure.core.async.impl.protocols :as ap]))
 
+; TODO: consider adding acceleration, not only velocity
 
 (defn spawn-producer
   ([client queue-url return-chan]
@@ -22,7 +24,7 @@
    ; thanks to channel buffer backpressure
    (async/go-loop [WaitTimeSeconds 0]
 
-     (if @(.closed return-chan)
+     (if (ap/closed? return-chan)
 
        true
 
@@ -39,6 +41,18 @@
              {:keys [Messages] :or {Messages []}}
              (async/<! (async/thread (aws/invoke client request)))
 
+             ; messages either need to be acked, nacked, or extended
+             ; by consumers before this deadline hits in order
+             ; to avoid another working gaining visibility
+             deadline
+             (async/timeout (* 0.75 VisibilityTimeout 1000))
+
+             metadata
+             {:deadline deadline :queue-url queue-url}
+
+             Messages
+             (mapv #(with-meta % metadata) Messages)
+
              abandoned
              (loop [[message :as messages] Messages]
                (if (not-empty messages)
@@ -47,10 +61,11 @@
                    messages)
                  []))]
 
-         ; channel was closed with some stragglers, nack them so other workers can begin asap.
+         ; channel was closed with some received but not going to be processed messages
+         ; nack them so they become visible asap
          (if (not-empty abandoned)
 
-           (do (async/<! (async/thread (sqs/nack-many client queue-url abandoned))) true)
+           (do (async/<! (async/thread (sqs/nack-many client abandoned))) true)
 
            (cond
              ; this set was empty, begin backing off the throttle
