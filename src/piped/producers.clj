@@ -22,7 +22,9 @@
    ; thanks to channel buffer backpressure
    (async/go-loop [WaitTimeSeconds 0]
 
-     (when (not @(.closed return-chan))
+     (if @(.closed return-chan)
+
+       true
 
        (let [request
              {:op      :ReceiveMessage

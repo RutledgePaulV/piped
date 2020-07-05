@@ -29,7 +29,8 @@
    [com.cognitect.aws/api "0.8.456"]
    [com.cognitect.aws/endpoints "1.1.11.813"]
    [com.cognitect.aws/sqs "801.2.702.0"]
-   [org.clojure/core.async "1.2.603"]]
+   [org.clojure/core.async "1.2.603"]
+   [org.clojure/tools.logging "1.1.0"]]
 
   :plugins
   [[lein-cloverage "1.1.2"]]

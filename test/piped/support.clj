@@ -20,7 +20,9 @@
 (defn localstack-client [client-opts]
   (delay
     (let [localstack-opts
-          {:credentials-provider
+          {:region
+           "us-east-1"
+           :credentials-provider
            (creds/basic-credentials-provider
              {:access-key-id     "localstack"
               :secret-access-key "localstack"})
