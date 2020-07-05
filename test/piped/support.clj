@@ -32,3 +32,19 @@
             :port     (.getMappedPort @localstack 4576)}}]
       (pprint/pprint localstack-opts)
       (aws/client (merge client-opts localstack-opts)))))
+
+(def client (localstack-client {:api :sqs}))
+
+(defn create-queue [queue-name]
+  (let [op {:op      :CreateQueue
+            :request {:QueueName queue-name}}]
+    (:QueueUrl (aws/invoke @client op))))
+
+(defn send-message [queue-url value]
+  (let [op {:op      :SendMessage
+            :request {:QueueUrl    queue-url
+                      :MessageBody (pr-str value)}}]
+    (:MessageId (aws/invoke @client op))))
+
+(defn gen-queue-name []
+  (name (gensym "piped-test-queue")))
