@@ -37,7 +37,8 @@
   :profiles
   {:test
    {:dependencies
-    [[org.testcontainers/testcontainers "1.14.3" :scope "test"]]}}
+    [[org.testcontainers/testcontainers "1.14.3" :scope "test"]
+     [org.slf4j/slf4j-simple "1.7.30" :scope "test"]]}}
 
   :repl-options
   {:init-ns piped.core})

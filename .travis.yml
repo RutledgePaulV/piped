@@ -2,6 +2,7 @@ language: clojure
 matrix:
   include:
     - jdk: openjdk12
+sudo: true
 services:
   - docker
 after_success:
