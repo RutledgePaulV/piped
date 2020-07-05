@@ -13,7 +13,9 @@
         (.setEnv [(str "HOSTNAME_EXTERNAL=" (.getContainerIpAddress container))])
         (.withStartupTimeout (Duration/ofMinutes 1))
         (.waitingFor (Wait/forLogMessage "^Ready\\.\\s*$" 1))
-        (.start)))))
+        (.start))
+      (println "Localstack started.")
+      container)))
 
 (defn localstack-client [client-opts]
   (delay
@@ -24,6 +26,6 @@
               :secret-access-key "localstack"})
            :endpoint-override
            {:protocol :http
-            :hostname "localhost"
+            :hostname (.getContainerIpAddress @localstack)
             :port     (.getMappedPort @localstack 4576)}}]
       (aws/client (merge client-opts localstack-opts)))))
