@@ -5,6 +5,7 @@ set -e
 # useful for debugging issues unique to that environment.
 
 docker run \
+  --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$HOME"/.m2:/root/.m2 \
   -v "$PWD":/usr/src/app \

@@ -1,7 +1,6 @@
 (ns piped.support
   (:require [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds]
-            [clojure.pprint :as pprint])
+            [cognitect.aws.credentials :as creds])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
            (java.time Duration)))
@@ -30,7 +29,6 @@
            {:protocol :http
             :hostname (.getContainerIpAddress @localstack)
             :port     (.getMappedPort @localstack 4576)}}]
-      (pprint/pprint localstack-opts)
       (aws/client (merge client-opts localstack-opts)))))
 
 (def client (localstack-client {:api :sqs}))

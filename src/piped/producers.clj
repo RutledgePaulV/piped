@@ -38,7 +38,7 @@
                         :MessageAttributeNames ["All"]}}
 
              ; poll for messages
-             {:keys [Messages] :or {Messages []}}
+             {:keys [Messages] :or {Messages []} :as response}
              (async/<! (async/thread (aws/invoke client request)))
 
              ; messages either need to be acked, nacked, or extended

@@ -1,6 +1,5 @@
 [![Build Status](https://travis-ci.com/rutledgepaulv/piped.svg?branch=master)](https://travis-ci.com/rutledgepaulv/piped)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/piped.svg)](https://clojars.org/org.clojars.rutledgepaulv/piped)
-[![codecov](https://codecov.io/gh/rutledgepaulv/piped/branch/master/graph/badge.svg)](https://codecov.io/gh/rutledgepaulv/piped)
 
 A Clojure library for building applications that leverage Amazon's SQS by adapting between AWS and core.async primitives. 
 AWS only provides a polling and bursty API but core.async is best as a continuous stream. Bridging from one to another in 
