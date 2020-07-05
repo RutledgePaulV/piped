@@ -110,16 +110,14 @@ stream instead of erratic bursts.
 
 [Squeedo](https://github.com/TheClimateCorporation/squeedo)
 
-Squeedo performs blocking-io from go blocks when receiving and acking messages, which is a big no-no and 
-hurts performance of all things using core.async within your program (and can lead to some nasty bugs). 
-For that reason I won't use it within my programs and decided to create my own that properly uses threads 
-and provides a more automatic set of resiliency features. Squeedo doesn't offer circuit breaking or lease 
-extensions, doesn't switch to long polling when activity is sparse, and it uses the heavyweight Java SDK. YMMV.
+Frankly I made this library because of perceived deficiencies in Squeedo and as such can't recommend it.
+Squeedo inappropriately performs blocking-io from go blocks when receiving and acking messages which can
+lead to some nasty bugs and poor performance. Squeedo also doesn't offer circuit breaking or lease 
+extensions, doesn't switch to long polling when activity is sparse, and it uses the heavyweight Java SDK. 
+YMMV.
 
-- https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L34-L36
-- https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L87-L91
+- [Performing a blocking ReceiveMessage call on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L34-L36)
+- [Performing blocking acks/nacks on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L87-L91)
 
-If you'd like to better understand the dangers of mixing blocking-io and go blocks, please read this excellent post:
-
-- https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/
+If you'd like to understand the dangers of mixing blocking-io and go blocks, please read [this excellent post](https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/).
 
