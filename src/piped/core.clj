@@ -6,7 +6,6 @@
             [piped.producers :as producers]))
 
 (defonce systems (atom {}))
-(defonce default-client (aws/client {:api :sqs}))
 
 (defn stop-system
   "For a given queue-url, stop the associated system (if any)."
@@ -28,8 +27,7 @@
    (spawn-system queue-url consumer-fn {}))
   ([queue-url consumer-fn
     {:keys [client blocking producer-n consumer-n pipe]
-     :or   {client     default-client
-            producer-n 1
+     :or   {producer-n 1
             consumer-n 1
             blocking   true
             pipe       (async/chan 10)}

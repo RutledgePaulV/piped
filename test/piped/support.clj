@@ -1,5 +1,6 @@
 (ns piped.support
-  (:require [cognitect.aws.client.api :as aws])
+  (:require [cognitect.aws.client.api :as aws]
+            [cognitect.aws.credentials :as creds])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
            (java.time Duration)))
@@ -17,7 +18,11 @@
 (defn localstack-client [client-opts]
   (delay
     (let [localstack-opts
-          {:endpoint-override
+          {:credentials-provider
+           (creds/basic-credentials-provider
+             {:access-key-id     "localstack"
+              :secret-access-key "localstack"})
+           :endpoint-override
            {:protocol :http
             :hostname "localhost"
             :port     (.getMappedPort @localstack 4576)}}]
