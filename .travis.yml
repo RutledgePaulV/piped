@@ -1,8 +1,8 @@
 language: clojure
+lein: 2.9.3
 matrix:
   include:
-    - jdk: openjdk12
-sudo: true
+    - jdk: openjdk13
 services:
   - docker
 after_success:
