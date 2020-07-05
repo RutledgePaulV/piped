@@ -39,9 +39,11 @@
 
              abandoned
              (loop [[message :as messages] Messages]
-               (if (async/>! return-chan message)
-                 (recur (rest messages))
-                 messages))]
+               (if (not-empty messages)
+                 (if (async/>! return-chan message)
+                   (recur (rest messages))
+                   messages)
+                 []))]
 
          ; channel was closed with some stragglers, nack them so other workers can begin asap.
          (if (not-empty abandoned)
