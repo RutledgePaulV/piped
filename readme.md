@@ -27,13 +27,13 @@ your processing function on a dedicated thread and should be used for blocking-i
 run your processing function on one of the go-block dispatch threads and should only be used for 
 cpu-bound tasks. Blocking consumers are the default when you create a system.
 
-#### Processing Function
+#### Message Processing Function
 
 This is the code that you write. It receives a message and can do whatever it wants with it. 
-If :ack or :nack are returned, the message will be acked or nacked. If an exception is thrown 
-the message will be nacked and will count towards circuit breaking. If anything else is 
-returned then the message will be acked. If you have multiple kinds of messages in your queue
-then a multimethod might be a good choice.
+If `:ack` or `:nack` are returned, the message will be acked or nacked. If an exception is thrown 
+the message will both be nacked and count towards circuit breaking. If anything else is 
+returned then the message will be acked. If you have multiple kinds of messages in your queue 
+a multimethod is a good choice.
 
 #### Middleware
 
@@ -54,10 +54,10 @@ A set of producers, consumers, and a pipe.
 (require '[piped.core :as piped])
 (require '[clojure.edn :as edn])
 
-(defmulti processor (fn [{:keys [body]}] (get body :type))
+(defmulti processor (comp :type :body))
 
-(defmethod processor :hello [{:keys [body]}]
-    (email/send-email (:recipient body) (:message body)))
+(defmethod processor :hello [{{:keys [recipient message]} :body}]
+    (my.app.email/send-email recipient message))
 
 (defmethod processor :default [msg] 
     (println "Received message I'm not prepared to handle!")
@@ -66,10 +66,15 @@ A set of producers, consumers, and a pipe.
 (defn parse-body [msg]
    (update msg :body edn/read-string))
 
-(def pipe (async/chan 100 (map parse-body)))
+(def middleware (map parse-body))
 
-; this would use the default aws credential chain, but you can pass your own client instance in the options
-(def stop-system (piped/spawn-system "https://queue.amazonaws.com/80398EXAMPLE/MyQueue" processor {:pipe pipe}))
+(def pipe (async/chan 100 middleware))
+
+(def queue-url "https://queue.amazonaws.com/80398EXAMPLE/MyQueue")
+
+; this would use the default aws credential chain
+; but you can pass your own client instance in the options
+(def stop-system (piped/spawn-system queue-url processor {:pipe pipe}))
 
 ; ... some time later
 
@@ -112,12 +117,11 @@ stream instead of erratic bursts.
 
 Frankly I made this library because of perceived deficiencies in Squeedo and as such can't recommend it.
 Squeedo inappropriately performs blocking-io from go blocks when receiving and acking messages which can
-lead to some nasty bugs and poor performance. Squeedo also doesn't offer circuit breaking or lease 
-extensions, doesn't switch to long polling when activity is sparse, and it uses the heavyweight Java SDK. 
+lead to some nasty bugs and poor performance. Squeedo doesn't provide much leverage over the raw AWS SDK. 
 YMMV.
 
 - [Performing a blocking ReceiveMessage call on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L34-L36)
 - [Performing blocking acks/nacks on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L87-L91)
 
-If you'd like to understand the dangers of mixing blocking-io and go blocks, please read [this excellent post](https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/).
+If you're unaware of the dangers of mixing blocking-io and go blocks, please read [this excellent post](https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/).
 

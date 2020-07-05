@@ -36,7 +36,7 @@
      (producers/spawn-producer client queue-url pipe))
    (dotimes [_ consumer-n]
      (if-not blocking
-       (consumers/spawn-consumer client pipe consumer-fn)
+       (consumers/spawn-consumer-compute client pipe consumer-fn)
        (consumers/spawn-consumer-blocking client pipe consumer-fn)))
    (fn [] (async/close! pipe))))
 
