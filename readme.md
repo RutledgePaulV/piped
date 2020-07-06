@@ -3,7 +3,7 @@
 
 A Clojure library for building applications that leverage Amazon's SQS by adapting between AWS and core.async primitives. 
 AWS only provides a polling and bursty API but core.async is best as a continuous stream. Bridging from one to another in 
-a way that achieves superior resilience and performance properties with the minimum configuration possible is the chief goal 
+a way that achieves superior resilience and performance properties with minimal configuration is the chief goal 
 of **piped**.
 
 ## Concepts
