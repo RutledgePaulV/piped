@@ -22,7 +22,7 @@
    ; our rate over time to align with the producer
    ; and we'll never exceed the rate of the consumer
    ; thanks to channel buffer backpressure
-   (async/go-loop [WaitTimeSeconds 0]
+   (utils/thread-loop [WaitTimeSeconds 0]
 
      (if (ap/closed? return-chan)
 
@@ -38,8 +38,8 @@
                         :MessageAttributeNames ["All"]}}
 
              ; poll for messages
-             {:keys [Messages] :or {Messages []} :as response}
-             (async/<! (async/thread (aws/invoke client request)))
+             {:keys [Messages] :or {Messages []}}
+             (aws/invoke client request)
 
              ; messages either need to be acked, nacked, or extended
              ; by consumers before this deadline hits in order
@@ -56,7 +56,7 @@
              abandoned
              (loop [[message :as messages] Messages]
                (if (not-empty messages)
-                 (if (async/>! return-chan message)
+                 (if (async/>!! return-chan message)
                    (recur (rest messages))
                    messages)
                  []))]
@@ -65,7 +65,7 @@
          ; nack them so they become visible asap
          (if (not-empty abandoned)
 
-           (do (async/<! (async/thread (sqs/nack-many client abandoned))) true)
+           (do (sqs/nack-many client abandoned) true)
 
            (cond
              ; this set was empty, begin backing off the throttle

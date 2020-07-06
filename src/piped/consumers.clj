@@ -4,9 +4,8 @@
             [clojure.tools.logging :as log]
             [piped.sqs :as sqs]))
 
-
-(defn- spawn-consumer* [client producer-chan message-fn]
-  (async/go-loop [msg (async/<! producer-chan)]
+(defn- spawn-consumer* [client input-chan message-fn]
+  (async/go-loop [msg (async/<! input-chan)]
     (when (some? msg)
       (let [deadline-chan (-> msg meta :deadline)
             task-chan     (message-fn msg)
