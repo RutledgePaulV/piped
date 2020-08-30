@@ -43,9 +43,9 @@
 
              ; messages either need to be acked, nacked, or extended
              ; by consumers before this deadline hits in order
-             ; to avoid another working gaining visibility
+             ; to avoid another worker gaining visibility
              deadline
-             (async/timeout (* 0.75 VisibilityTimeout 1000))
+             (async/timeout (- 200 (* VisibilityTimeout 1000)))
 
              metadata
              {:deadline deadline :queue-url queue-url}
@@ -61,8 +61,8 @@
                    messages)
                  []))]
 
-         ; channel was closed with some received but not going to be processed messages
-         ; nack them so they become visible asap
+         ; channel was closed with some received messages that won't be processed
+         ; nack them so they become visible to others asap
          (if (not-empty abandoned)
 
            (do (sqs/nack-many client abandoned) true)

@@ -2,21 +2,27 @@
   "Code relating to reading SQS messages from channels and processing them."
   (:require [clojure.core.async :as async]
             [clojure.tools.logging :as log]
+            [piped.utils :as utils]
             [piped.sqs :as sqs]))
 
 (defn- spawn-consumer* [client input-chan message-fn]
-  (async/go-loop [msg (async/<! input-chan)]
-    (when (some? msg)
-      (let [deadline-chan (-> msg meta :deadline)
-            task-chan     (message-fn msg)
-            action        (async/alt!
-                            [task-chan] ([v] v)
-                            [deadline-chan] :extend
-                            :priority true)]
-        (case action
-          :ack ()
-          :nack ()
-          :extend ())))))
+  (utils/thread-loop [msg (async/<!! input-chan)]
+    (let [deadline-chan (-> msg meta :deadline)
+          task-chan     (message-fn msg)
+          action        (async/alt!!
+                          [task-chan] ([v] v)
+                          [deadline-chan] :extend
+                          :priority true)]
+      (case action
+        :ack
+        (do (sqs/ack-one client msg)
+            (recur (async/<!! input-chan)))
+        :nack
+        (do (sqs/nack-one client msg)
+            (recur (async/<!! input-chan)))
+        :extend
+        (do (sqs/change-visibility-one client msg 30)
+            (recur msg))))))
 
 (defn- ->processor
   "Turns a function with unknown behavior into a predictable

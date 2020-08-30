@@ -22,6 +22,27 @@
       (recur (conj messages msg))
       messages)))
 
+(defn deadline-batching
+  "Batches messages from chan and emits the most recently accumulated batch whenever
+   the max batch size is reached or one of the messages in the batch has become 'due'
+   for action."
+  [chan max key-fn]
+  (let [return (async/chan)]
+    (async/go-loop [mix (async/mix (async/chan)) batch []]
+      (let [timeout (async/muxch* mix)]
+        (if (= max (count batch))
+          (do (async/>! return batch)
+              (recur (async/mix timeout) []))
+          (if-some [result (async/alt! chan ([v] v) timeout ([_] ::timeout) :priority true)]
+            (if (= result ::timeout)
+              (do (when (not-empty batch) (async/>! return batch))
+                  (recur (async/mix (async/muxch* mix)) []))
+              (let [deadline (key-fn result)]
+                (recur (doto mix (async/admix deadline)) (conj batch result))))
+            (when (not-empty batch)
+              (async/>! return batch))))))
+    return))
+
 (defn batching
   "Partitions the original chan by non-empty time intervals."
   ([chan msecs]
@@ -44,3 +65,5 @@
          (when (not-empty batch)
            (async/>! return batch))))
      return)))
+
+

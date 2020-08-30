@@ -30,7 +30,7 @@
      :or   {producer-parallelism 1
             consumer-parallelism 5
             blocking-consumers   true
-            pipe                 (async/chan 10)}}]
+            pipe                 (async/chan 5)}}]
 
    (letfn [(spawn-producer []
              (producers/spawn-producer client queue-url pipe))
