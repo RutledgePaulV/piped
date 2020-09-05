@@ -45,7 +45,7 @@
              ; by consumers before this deadline hits in order
              ; to avoid another worker gaining visibility
              deadline
-             (async/timeout (- (* VisibilityTimeout 1000) 200))
+             (async/timeout (- (* VisibilityTimeout 1000) 400))
 
              metadata
              {:deadline deadline :queue-url queue-url}
@@ -70,7 +70,7 @@
            (cond
              ; this set was empty, begin backing off the throttle
              (empty? Messages)
-             (recur (utils/bounded-inc WaitTimeSeconds 20))
+             (recur (utils/clamp 0 20 (dec WaitTimeSeconds)))
 
              ; this round was neither empty nor full, stay the course
              (< 0 (count Messages) MaxNumberOfMessages)
@@ -78,4 +78,4 @@
 
              ; this round was full, hit the gas!
              (= (count Messages) MaxNumberOfMessages)
-             (recur (utils/bounded-dec WaitTimeSeconds 0)))))))))
+             (recur (utils/clamp 0 20 (inc WaitTimeSeconds))))))))))

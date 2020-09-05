@@ -1,19 +1,19 @@
 (ns piped.sqs
   "Functions relating to interacting with SQS."
   (:require [cognitect.aws.client.api.async :as api.async]
-            [piped.utils :as utils]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
   (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
     (if (empty? channels)
       results
-      (let [[value port] (async/alts! channels)]
+      (let [[value port] (async/alts! (vec channels))]
         (recur
           (disj channels port)
           (-> results
-              (update :Successful #(apply conj % (:Successful value)))
-              (update :Failed #(apply conj % (:Failed value)))))))))
+              (update :Successful #(into % (:Successful value [])))
+              (update :Failed #(into % (:Failed value [])))))))))
 
 (defn change-visibility-one [client {:keys [ReceiptHandle] :as message} visibility-timeout]
   (let [request {:op      :ChangeMessageVisibility

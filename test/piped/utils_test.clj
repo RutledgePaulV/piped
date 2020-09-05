@@ -28,3 +28,25 @@
     (is (= 1 (count (deref received))))
     (is (= 3 (count (first (deref received)))))))
 
+
+(deftest batching-test
+  (let [received (atom [])
+        msg1     {:data 1}
+        msg2     {:data 2}
+        msg3     {:data 3}
+        chan     (async/chan)
+        return   (batching chan 5000 5)]
+
+    (async/go-loop []
+      (when-some [item (async/<! return)]
+        (swap! received conj item)
+        (recur)))
+
+    (async/>!! chan msg1)
+    (async/>!! chan msg2)
+    (async/>!! chan msg3)
+    (is (empty? (deref received)))
+    (async/close! chan)
+    (async/<!! (async/timeout 100))
+    (is (= 1 (count (deref received))))
+    (is (= 3 (count (first (deref received)))))))

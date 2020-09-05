@@ -2,8 +2,7 @@
   (:require [clojure.test :refer :all]
             [piped.core :refer :all]
             [clojure.edn :as edn]
-            [piped.support :as support]
-            [clojure.core.async :as async]))
+            [piped.support :as support]))
 
 (use-fixtures :each (fn [tests] (stop-all-systems) (tests) (stop-all-systems)))
 
@@ -14,8 +13,7 @@
         queue-url  (support/create-queue queue-name)
         received   (promise)
         consumer   (fn [message] (deliver received message))
-        pipe       (async/chan 10 xform)
-        shutdown   (spawn-system @support/client queue-url consumer {:pipe pipe})
+        shutdown   (spawn-system @support/client queue-url consumer {:xform xform})
         data       {:value 1}]
     (try
       (support/send-message queue-url data)
