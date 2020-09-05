@@ -3,7 +3,7 @@
   (:require [piped.utils :as utils]
             [piped.sqs :as sqs]
             [clojure.core.async :as async]
-            [cognitect.aws.client.api :as aws]
+            [cognitect.aws.client.api.async :as api.async]
             [clojure.core.async.impl.protocols :as ap]))
 
 ; TODO: consider adding acceleration, not only velocity
@@ -22,7 +22,7 @@
    ; our rate over time to align with the producer
    ; and we'll never exceed the rate of the consumer
    ; thanks to channel buffer backpressure
-   (utils/thread-loop [WaitTimeSeconds 0]
+   (async/go-loop [WaitTimeSeconds 0]
 
      (if (ap/closed? return-chan)
 
@@ -39,13 +39,13 @@
 
              ; poll for messages
              {:keys [Messages] :or {Messages []}}
-             (aws/invoke client request)
+             (async/<! (api.async/invoke client request))
 
              ; messages either need to be acked, nacked, or extended
              ; by consumers before this deadline hits in order
-             ; to avoid another working gaining visibility
+             ; to avoid another worker gaining visibility
              deadline
-             (async/timeout (* 0.75 VisibilityTimeout 1000))
+             (async/timeout (- (* VisibilityTimeout 1000) 400))
 
              metadata
              {:deadline deadline :queue-url queue-url}
@@ -56,21 +56,21 @@
              abandoned
              (loop [[message :as messages] Messages]
                (if (not-empty messages)
-                 (if (async/>!! return-chan message)
+                 (if (async/>! return-chan message)
                    (recur (rest messages))
                    messages)
                  []))]
 
-         ; channel was closed with some received but not going to be processed messages
-         ; nack them so they become visible asap
+         ; channel was closed with some received messages that won't be processed
+         ; nack them so they become visible to others asap
          (if (not-empty abandoned)
 
-           (do (sqs/nack-many client abandoned) true)
+           (do (async/<! (sqs/nack-many client abandoned)) true)
 
            (cond
              ; this set was empty, begin backing off the throttle
              (empty? Messages)
-             (recur (utils/bounded-inc WaitTimeSeconds 20))
+             (recur (utils/clamp 0 20 (dec WaitTimeSeconds)))
 
              ; this round was neither empty nor full, stay the course
              (< 0 (count Messages) MaxNumberOfMessages)
@@ -78,4 +78,4 @@
 
              ; this round was full, hit the gas!
              (= (count Messages) MaxNumberOfMessages)
-             (recur (utils/bounded-dec WaitTimeSeconds 0)))))))))
+             (recur (utils/clamp 0 20 (inc WaitTimeSeconds))))))))))
