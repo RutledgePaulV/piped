@@ -42,9 +42,10 @@
 
      (let [producers (doall (repeatedly producer-parallelism spawn-producer))
            consumers (doall (repeatedly consumer-parallelism spawn-consumer))
-           shutdown  (fn []
+           shutdown  (fn [internal?]
                        ; remove it from the registry, it's coming down
-                       (swap! systems dissoc queue-url)
+                       (when-not internal?
+                         (swap! systems dissoc queue-url))
                        ; stop the flow of data from producers to consumers
                        (async/close! pipe)
                        ; wait for producers to exit
@@ -54,8 +55,8 @@
 
        (let [[old] (swap-vals! systems assoc queue-url shutdown)]
          (when-some [shutdown-for-old-system (get old queue-url)]
-           (shutdown-for-old-system)))
+           (shutdown-for-old-system true)))
 
-       shutdown))))
+       (fn [] (shutdown false))))))
 
 

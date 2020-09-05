@@ -39,8 +39,9 @@
                   (recur (async/mix (async/muxch* mix)) []))
               (let [deadline (key-fn result)]
                 (recur (doto mix (async/admix deadline)) (conj batch result))))
-            (when (not-empty batch)
-              (async/>! return batch))))))
+            (do (when (not-empty batch)
+                  (async/>! return batch))
+                (async/close! return))))))
     return))
 
 (defn batching

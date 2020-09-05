@@ -1,18 +1,26 @@
 (ns piped.sqs
   "Functions relating to interacting with SQS."
-  (:require [cognitect.aws.client.api :as aws]
-            [piped.utils :as utils]))
+  (:require [cognitect.aws.client.api.async :as api.async]
+            [piped.utils :as utils]
+            [clojure.core.async :as async]))
 
-(defn- combine-batch-results [results]
-  {:Successful (vec (mapcat :Successful results))
-   :Failed     (vec (mapcat :Failed results))})
+(defn- combine-batch-results [result-chans]
+  (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
+    (if (empty? channels)
+      results
+      (let [[value port] (async/alts! channels)]
+        (recur
+          (disj channels port)
+          (-> results
+              (update :Successful #(apply conj % (:Successful value)))
+              (update :Failed #(apply conj % (:Failed value)))))))))
 
 (defn change-visibility-one [client {:keys [ReceiptHandle] :as message} visibility-timeout]
   (let [request {:op      :ChangeMessageVisibility
                  :request {:QueueUrl          (utils/message->queue-url message)
                            :ReceiptHandle     ReceiptHandle
                            :VisibilityTimeout visibility-timeout}}]
-    (aws/invoke client request)))
+    (api.async/invoke client request)))
 
 (defn change-visibility-batch [client messages visibility-timeout]
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
@@ -22,7 +30,7 @@
                                               {:Id                MessageId
                                                :ReceiptHandle     ReceiptHandle
                                                :VisibilityTimeout visibility-timeout})}}]
-           (aws/invoke client request)))
+           (api.async/invoke client request)))
        (combine-batch-results)))
 
 (defn ack-one [client {:keys [ReceiptHandle] :as message}]
@@ -30,7 +38,7 @@
         request   {:op      :DeleteMessage
                    :request {:QueueUrl      queue-url
                              :ReceiptHandle ReceiptHandle}}]
-    (aws/invoke client request)))
+    (api.async/invoke client request)))
 
 (defn ack-many [client messages]
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
@@ -40,7 +48,7 @@
                           :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
                                       {:Id            MessageId
                                        :ReceiptHandle ReceiptHandle})}}]
-           (aws/invoke client request)))
+           (api.async/invoke client request)))
        (combine-batch-results)))
 
 (defn nack-one [client message]
