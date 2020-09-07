@@ -3,7 +3,8 @@
   (:require [clojure.core.async :as async]
             [piped.consumers :as consumers]
             [piped.producers :as producers]
-            [piped.actions :as actions]))
+            [piped.actions :as actions]
+            [piped.utils :as utils]))
 
 ; system registry
 (defonce systems (atom {}))
@@ -26,32 +27,44 @@
    Returns a function of no arguments that can be called to stop the system."
   ([client queue-url consumer-fn]
    (spawn-system client queue-url consumer-fn {}))
-  ([client queue-url consumer-fn
-    {:keys [producer-parallelism consumer-parallelism acker-parallelism nacker-parallelism blocking-consumers xform]
-     :or   {producer-parallelism 1
-            consumer-parallelism 5
-            acker-parallelism    1
-            nacker-parallelism   1
-            blocking-consumers   true
-            xform                (map identity)}}]
 
-   (let [acker-chan  (async/chan 10)
-         nacker-chan (async/chan 10)
-         pipe        (async/chan (+ 2 consumer-parallelism) xform)]
+  ([client queue-url consumer-fn
+
+    {:keys [producer-parallelism
+            consumer-parallelism
+            acker-parallelism
+            nacker-parallelism
+            blocking-consumers
+            transform]
+
+     :or   {producer-parallelism 1
+            consumer-parallelism 10
+            acker-parallelism    2
+            nacker-parallelism   2
+            blocking-consumers   true
+            transform            identity}}]
+
+   (let [acker-chan     (async/chan 10)
+         nacker-chan    (async/chan 10)
+         pipe           (async/chan)
+         transformed    (async/map transform [pipe])
+         acker-batched  (utils/deadline-batching acker-chan 10 utils/message->deadline)
+         nacker-batched (utils/batching nacker-chan 5000 10)]
 
      (letfn [(spawn-producer []
-               (producers/spawn-producer client queue-url pipe))
+               (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
+                 (producers/spawn-producer client queue-url pipe nacker-chan opts)))
 
              (spawn-consumer []
                (if blocking-consumers
-                 (consumers/spawn-consumer-blocking client pipe acker-chan nacker-chan consumer-fn)
-                 (consumers/spawn-consumer-compute client pipe acker-chan nacker-chan consumer-fn)))
+                 (consumers/spawn-consumer-blocking client transformed acker-chan nacker-chan consumer-fn)
+                 (consumers/spawn-consumer-compute client transformed acker-chan nacker-chan consumer-fn)))
 
              (spawn-acker []
-               (actions/spawn-acker client acker-chan))
+               (actions/spawn-acker client acker-batched))
 
              (spawn-nacker []
-               (actions/spawn-nacker client nacker-chan))]
+               (actions/spawn-nacker client nacker-batched))]
 
        (let [producers (doall (repeatedly producer-parallelism spawn-producer))
              consumers (doall (repeatedly consumer-parallelism spawn-consumer))
@@ -63,19 +76,15 @@
                            (swap! systems dissoc queue-url))
                          ; stop the flow of data from producers to consumers
                          (async/close! pipe)
-                         #_(println "awaiting producers")
                          ; wait for producers to exit
                          (run! async/<!! producers)
-                         #_(println "awaiting consumers")
                          ; wait for consumers to exit
                          (run! async/<!! consumers)
                          ; wait for ackers to exit
                          (async/close! acker-chan)
-                         #_(println "awaiting ackers")
                          (run! async/<!! ackers)
                          ; wait for nackers to exit
                          (async/close! nacker-chan)
-                         #_(println "awaiting nackers")
                          (run! async/<!! nackers))]
 
          (let [[old] (swap-vals! systems assoc queue-url shutdown)]

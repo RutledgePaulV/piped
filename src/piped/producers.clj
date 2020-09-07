@@ -1,81 +1,117 @@
 (ns piped.producers
   "Code relating to polling SQS messages from AWS and getting them onto channels."
   (:require [piped.utils :as utils]
-            [piped.sqs :as sqs]
             [clojure.core.async :as async]
             [cognitect.aws.client.api.async :as api.async]
-            [clojure.core.async.impl.protocols :as ap]))
+            [clojure.tools.logging :as log]))
 
-; TODO: consider adding acceleration, not only velocity
 
 (defn spawn-producer
-  ([client queue-url return-chan]
-   (spawn-producer client queue-url return-chan {}))
+  ([client queue-url output-chan]
+   (spawn-producer client queue-url output-chan (utils/dev-null)))
 
-  ([client
-    queue-url
-    return-chan
-    {:keys [MaxNumberOfMessages VisibilityTimeout]
-     :or   {MaxNumberOfMessages 10 VisibilityTimeout 30}}]
+  ([client queue-url output-chan nack-chan]
+   (spawn-producer client queue-url output-chan nack-chan {}))
 
-   ; always start with a short poll, then we'll adjust
-   ; our rate over time to align with the producer
-   ; and we'll never exceed the rate of the consumer
-   ; thanks to channel buffer backpressure
-   (async/go-loop [WaitTimeSeconds 0]
+  ([client queue-url output-chan nack-chan
+    {:keys [MaxNumberOfMessages VisibilityTimeout MaxArtificialDelay]
+     :or   {MaxNumberOfMessages 10 VisibilityTimeout 30 MaxArtificialDelay 60000}}]
 
-     (if (ap/closed? return-chan)
+   (let [close-chan (async/promise-chan)]
 
-       true
+     (utils/on-chan-close output-chan (async/close! close-chan))
+
+     (async/go-loop [max-number-of-messages MaxNumberOfMessages backoff-seq []]
+
+       (log/debugf "Beginning new long poll of sqs queue %s." queue-url)
 
        (let [request
              {:op      :ReceiveMessage
               :request {:QueueUrl              queue-url
-                        :MaxNumberOfMessages   MaxNumberOfMessages
+                        :MaxNumberOfMessages   max-number-of-messages
                         :VisibilityTimeout     VisibilityTimeout
-                        :WaitTimeSeconds       WaitTimeSeconds
+                        :WaitTimeSeconds       utils/maximum-wait-time-seconds
                         :AttributeNames        ["All"]
                         :MessageAttributeNames ["All"]}}
 
              ; poll for messages
-             {:keys [Messages] :or {Messages []}}
-             (async/<! (api.async/invoke client request))
+             response
+             (async/alt!
+               [(api.async/invoke client request)] ([v] v)
+               ; if output-chan was closed while we're polling, abandon the poll.
+               [close-chan] {:closed true})
 
-             ; messages either need to be acked, nacked, or extended
-             ; by consumers before this deadline hits in order
-             ; to avoid another worker gaining visibility
+             original-messages
+             (get response :Messages [])
+
              deadline
-             (async/timeout (- (* VisibilityTimeout 1000) 400))
+             (async/timeout (- (* utils/visibility-timeout-seconds 1000) utils/deadline-safety-buffer))
 
              metadata
              {:deadline deadline :queue-url queue-url}
 
-             Messages
-             (mapv #(with-meta % metadata) Messages)
+             messages-with-metadata
+             (mapv #(with-meta % metadata) original-messages)
 
-             abandoned
-             (loop [[message :as messages] Messages]
-               (if (not-empty messages)
-                 (if (async/>! return-chan message)
-                   (recur (rest messages))
-                   messages)
-                 []))]
+             [action remainder]
+             (if (empty? messages-with-metadata)
+               (cond
+                 (utils/anomaly? response)
+                 [:error []]
+                 (true? (get response :closed))
+                 [:closed []]
+                 :else
+                 [:empty []])
+               (loop [[message :as messages] messages-with-metadata]
+                 (if (seq messages)
+                   (if-some [result
+                             (async/alt!
+                               [[output-chan message]]
+                               ([val _] (if val ::accepted nil))
+                               [deadline] ::timeout
+                               :priority true)]
+                     (if (= ::accepted result)
+                       (recur (rest messages))
+                       [:dead (into [] messages)])
+                     [:closed (into [] messages)])
+                   [:accepted []])))]
 
-         ; channel was closed with some received messages that won't be processed
-         ; nack them so they become visible to others asap
-         (if (not-empty abandoned)
+         (case action
+           :error
+           (let [backoffs (if (seq backoff-seq) backoff-seq (utils/backoff-seq MaxArtificialDelay))]
+             (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
+             (async/<! (async/timeout (first backoffs)))
+             (recur max-number-of-messages (rest backoffs)))
 
-           (do (async/<! (sqs/nack-many client abandoned)) true)
+           :empty
+           (let [backoffs (if (seq backoff-seq) backoff-seq (utils/backoff-seq MaxArtificialDelay))]
+             (log/debugf "Empty response when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
+             (async/<! (async/timeout (first backoffs)))
+             (recur max-number-of-messages (rest backoffs)))
 
-           (cond
-             ; this set was empty, begin backing off the throttle
-             (empty? Messages)
-             (recur (utils/clamp 0 20 (dec WaitTimeSeconds)))
+           :dead
+           (let [wanted    max-number-of-messages
+                 received  (count original-messages)
+                 accepted  (- received (count remainder))
+                 new-count (utils/clamp
+                             utils/minimum-messages-received
+                             utils/maximum-messages-received
+                             (utils/average- accepted wanted))]
+             (log/debugf "Consumers were unable to accept new messages from %s before the messages expired." queue-url)
+             ; probably just let aws handle it since already very near expiry
+             #_(async/onto-chan! nack-chan remainder false)
+             (recur new-count []))
 
-             ; this round was neither empty nor full, stay the course
-             (< 0 (count Messages) MaxNumberOfMessages)
-             (recur WaitTimeSeconds)
+           :closed
+           (do (log/debugf "Producer stopping because channel for queue %s has been closed." queue-url)
+               (async/<! (async/onto-chan! nack-chan remainder false))
+               :complete)
 
-             ; this round was full, hit the gas!
-             (= (count Messages) MaxNumberOfMessages)
-             (recur (utils/clamp 0 20 (inc WaitTimeSeconds))))))))))
+           :accepted
+           (let [received  (count original-messages)
+                 new-count (utils/clamp
+                             utils/minimum-messages-received
+                             utils/maximum-messages-received
+                             (utils/average+ received utils/maximum-messages-received))]
+             (log/debugf "All messages polled from %s were accepted by consumers." queue-url)
+             (recur new-count []))))))))
