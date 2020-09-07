@@ -34,13 +34,6 @@ the message will both be nacked and count towards circuit breaking. If anything 
 returned then the message will be acked. If you have multiple kinds of messages in your queue 
 a multimethod is a good choice.
 
-#### Middleware
-
-Nothing is provided for this, but you may certainly add a transducer to your pipe to transform 
-(parse) messages prior to processing them. Remember that filtering a message out means it won't
-be acked (never reaches the consumers or processing function) and will just be re-enqueued by 
-SQS once the visibility timeout expires.
-
 #### System
 
 A set of producers, consumers, and a pipe.
