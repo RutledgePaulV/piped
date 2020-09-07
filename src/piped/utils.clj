@@ -1,6 +1,15 @@
 (ns piped.utils
   "Utility functions."
-  (:require [clojure.core.async :as async]))
+  (:require [clojure.core.async :as async])
+  (:import [clojure.core.async.impl.channels ManyToManyChannel]
+           [java.util UUID]))
+
+(def visibility-timeout-seconds 30)
+(def minimum-messages-received 1)
+(def maximum-messages-received 10)
+(def minimum-wait-time-seconds 0)
+(def maximum-wait-time-seconds 20)
+(def deadline-safety-buffer 400)
 
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
@@ -11,8 +20,39 @@
 (defn with-deadline [message duration]
   (vary-meta message assoc :deadline (async/timeout duration)))
 
+(defn anomaly? [response]
+  (contains? response :cognitect.anomalies/category))
+
 (defn clamp [start end x]
   (min (max start x) end))
+
+(defn average [& args]
+  (let [agg (reduce (fn [agg x]
+                      (-> agg
+                          (update :sum + x)
+                          (update :count inc)))
+                    {:sum 0 :count 0}
+                    args)]
+    (/ (:sum agg) (:count agg))))
+
+(defn average+ [& args]
+  (long (Math/ceil (apply average args))))
+
+(defn average- [& args]
+  (long (Math/floor (apply average args))))
+
+(defn dev-null []
+  (async/chan (async/dropping-buffer 0)))
+
+(defn backoff-seq
+  "Returns an infinite seq of exponential back-off timeouts with random jitter."
+  [max]
+  (->>
+    (lazy-cat
+      (->> (cons 0 (iterate (partial * 2) 1000))
+           (take-while #(< % max)))
+      (repeat max))
+    (map (fn [x] (+ x (rand-int 1000))))))
 
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
@@ -24,28 +64,20 @@
     (async/go-loop [mix (async/mix (async/chan)) batch []]
       (let [timeout (async/muxch* mix)]
         (if (= max (count batch))
-          (do
-            #_(println "reached max batch size, emitting batch and starting new round")
-            (when (async/>! return batch)
-              (recur (async/mix (async/chan)) [])))
-          (do
-            #_(println "waiting for message or batch timeout, whichever comes first.")
-            (if-some [result (async/alt! chan ([v] v) timeout ([_] ::timeout) :priority true)]
-              (if (= result ::timeout)
-                (do
-                  #_(println "batch accumulation timed out, emitting batch and starting new round")
-                  (if (not-empty batch)
-                    (when (async/>! return batch)
-                      (recur (async/mix (async/chan)) []))
-                    (recur (async/mix (async/chan)) [])))
-                (let [deadline (key-fn result)]
-                  #_(println "Received new message, adding to timeout mix and recurring.")
-                  (recur (doto mix (async/admix deadline)) (conj batch result))))
-              (do
-                #_(println "input channel was closed, emitting last batch (if any) and closing return chan.")
-                (when (not-empty batch)
-                  (async/>! return batch))
-                (async/close! return)))))))
+          (when (async/>! return batch)
+            (recur (async/mix (async/chan)) []))
+          (if-some [result (async/alt! chan ([v] v) timeout ([_] ::timeout) :priority true)]
+            (if (= result ::timeout)
+              (if (not-empty batch)
+                (when (async/>! return batch)
+                  (recur (async/mix (async/chan)) []))
+                (recur (async/mix (async/chan)) []))
+              (let [deadline (key-fn result)]
+                (recur (doto mix (async/admix deadline)) (conj batch result))))
+            (do
+              (when (not-empty batch)
+                (async/>! return batch))
+              (async/close! return))))))
     return))
 
 (defn batching
@@ -72,4 +104,12 @@
              (async/close! return))))
      return)))
 
-
+(defmacro on-chan-close [chan & body]
+  `(let [id#      (UUID/randomUUID)
+         channel# ~chan]
+     (add-watch
+       (.closed ^ManyToManyChannel channel#) id#
+       (^:once fn* [k# r# o# n#]
+         (when (and (false? o#) (true? n#))
+           (try ~@body (finally (remove-watch r# id#))))))
+     channel#))
