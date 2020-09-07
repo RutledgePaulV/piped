@@ -5,9 +5,10 @@
             [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
-  (if (= 1 (count result-chans))
+  (if (= 1 (bounded-count 2 result-chans))
     (first result-chans)
-    (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
+    (async/go-loop [channels (set result-chans)
+                    results {:Successful [] :Failed []}]
       (if (empty? channels)
         results
         (let [[value port] (async/alts! (vec channels))]
