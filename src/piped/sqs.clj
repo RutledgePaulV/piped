@@ -5,15 +5,17 @@
             [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
-  (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
-    (if (empty? channels)
-      results
-      (let [[value port] (async/alts! (vec channels))]
-        (recur
-          (disj channels port)
-          (-> results
-              (update :Successful #(into % (:Successful value [])))
-              (update :Failed #(into % (:Failed value [])))))))))
+  (if (= 1 (count result-chans))
+    (first result-chans)
+    (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
+      (if (empty? channels)
+        results
+        (let [[value port] (async/alts! (vec channels))]
+          (recur
+            (disj channels port)
+            (-> results
+                (update :Successful #(into % (:Successful value [])))
+                (update :Failed #(into % (:Failed value []))))))))))
 
 (defn change-visibility-one [client {:keys [ReceiptHandle] :as message} visibility-timeout]
   (let [request {:op      :ChangeMessageVisibility
