@@ -48,9 +48,10 @@
          (let [request
                {:op      :DeleteMessageBatch
                 :request {:QueueUrl queue-url
-                          :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
-                                      {:Id            MessageId
-                                       :ReceiptHandle ReceiptHandle})}}]
+                          :Entries  (distinct
+                                      (for [{:keys [MessageId ReceiptHandle]} messages]
+                                        {:Id            MessageId
+                                         :ReceiptHandle ReceiptHandle}))}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
 

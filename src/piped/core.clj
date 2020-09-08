@@ -4,9 +4,12 @@
             [piped.consumers :as consumers]
             [piped.producers :as producers]
             [piped.actions :as actions]
-            [piped.utils :as utils]))
+            [piped.utils :as utils]
+            [cognitect.aws.client.api :as aws]
+            [clojure.edn :as edn]))
 
 (defprotocol PipedSystem
+  :extend-via-metadata true
   (start [this] "Start polling SQS and processing messages.")
   (stop [this] "Stop the system and await completion of in-flight messages."))
 
@@ -35,12 +38,21 @@
   []
   (run! start (vals @systems)))
 
-(defn spawn-system
+(defn default-client []
+  (aws/client {:api :sqs}))
+
+(defn default-transform [message]
+  (update message :Body edn/read-string))
+
+(defn create-system
   "Spawns a set of producers and consumers for a given queue.
 
    Returns a function of no arguments that can be called to stop the system."
+  ([{:keys [client queue-url consumer-fn] :as attrs}]
+   (create-system client queue-url consumer-fn (dissoc attrs :client :queue-url :consumer-fn)))
+
   ([client queue-url consumer-fn]
-   (spawn-system client queue-url consumer-fn {}))
+   (create-system client queue-url consumer-fn {}))
 
   ([client queue-url consumer-fn
 
@@ -55,10 +67,11 @@
             consumer-parallelism 10
             acker-parallelism    2
             nacker-parallelism   2
-            blocking-consumers   true
-            transform            identity}}]
+            blocking-consumers   true}}]
 
-   (let [acker-chan     (async/chan 10)
+   (let [client         (or client (default-client))
+         transform      (or transform default-transform)
+         acker-chan     (async/chan 10)
          nacker-chan    (async/chan 10)
          pipe           (async/chan)
          transformed    (async/map transform [pipe])
@@ -92,28 +105,32 @@
                (fn []
                  (when (realized? processes)
                    (let [{:keys [producers consumers ackers nackers]} (force processes)]
-                     ; stop the flow of data from producers to consumers
+                     ; signal producers and consumers
                      (async/close! pipe)
                      ; wait for producers to exit
                      (run! async/<!! producers)
                      ; wait for consumers to exit
                      (run! async/<!! consumers)
-                     ; wait for ackers to exit
+                     ; signal ackers
                      (async/close! acker-chan)
+                     ; wait for ackers to exit
                      (run! async/<!! ackers)
-                     ; wait for nackers to exit
+                     ; signal nackers
                      (async/close! nacker-chan)
+                     ; wait for nackers to exit
                      (run! async/<!! nackers)))))
 
              system
              (reify PipedSystem
                (start [this]
-                 (.addShutdownHook (Runtime/getRuntime) shutdown-thread)
-                 (force processes)
+                 (when-not (realized? processes)
+                   (.addShutdownHook (Runtime/getRuntime) shutdown-thread)
+                   (force processes))
                  this)
                (stop [this]
-                 (.removeShutdownHook (Runtime/getRuntime) shutdown-thread)
-                 (.run shutdown-thread)
+                 (when (realized? processes)
+                   (.removeShutdownHook (Runtime/getRuntime) shutdown-thread)
+                   (.run shutdown-thread))
                  this))]
 
          (swap! systems assoc queue-url system)

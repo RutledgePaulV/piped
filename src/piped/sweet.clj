@@ -1,28 +1,32 @@
 (ns piped.sweet
   (:require [piped.core :as piped]
-            [cognitect.aws.client.api :as aws]
             [clojure.tools.logging :as log]))
 
 
+(defmacro defmulti*
+  "Like clojure.core/defmulti, but actually updates the dispatch value when you reload it."
+  [symbol dispatch-fn]
+  `(let [dispatch-fun# ~dispatch-fn
+         existing-var# (resolve '~symbol)]
+     (if-some [dispatch# (some-> existing-var# meta ::holder)]
+       (do (vreset! dispatch# dispatch-fun#) existing-var#)
+       (let [holder# (volatile! dispatch-fun#)
+             var#    (defmulti ~symbol (fn [& args#] (apply @holder# args#)))]
+         (alter-meta! var# merge {::holder holder#})
+         var#))))
 
-(comment
-  (defmacro defprocessor [symbol bindings attributes & body]
-    `(let [client# (aws/client {:api :sqs})
-           attrs#  ~attributes
-           var#    (defmulti ~symbol (fn ~bindings ~@body))
-           system# (delay (piped/spawn-system client# (get attrs# :queue-url) var# attrs#))]
-       (with-meta var# {:system system#})))
-
-  (defprocessor queue-processor [message]
-                {:queue-url            "http://localhost:4576/queue/piped-test-queue17460"
-                 :consumer-parallelism 10
-                 :producer-parallelism 2
-                 :transform            identity}
-                (get message :kind))
-
-  (defmethod queue-processor :alert [message]
-    )
-
-  (defmethod queue-processor :alert [message]
-    )
-  )
+(defmacro defprocessor [symbol bindings attributes & body]
+  `(when-not *compile-files*
+     (let [attrs#  ~attributes
+           var#    (defmulti* ~symbol (fn ~bindings ~@body))
+           system# (if-some [existing# (some-> var# meta ::system)]
+                     (do (piped/stop existing#) (piped/create-system (assoc attrs# :consumer-fn (deref var#))))
+                     (piped/create-system (assoc attrs# :consumer-fn var#)))]
+       (defmethod ~symbol :default [msg#]
+         (log/warnf "Received unfamiliar message %s. Message will be nacked." (get msg# :MessageId))
+         :nack)
+       (let [metadata# {::system     system#
+                        `piped/start (fn [& args#] (piped/start system#))
+                        `piped/stop  (fn [& args#] (piped/stop system#))}]
+         (alter-meta! var# merge metadata#))
+       var#)))
