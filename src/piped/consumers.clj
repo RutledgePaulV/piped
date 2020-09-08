@@ -34,7 +34,7 @@
           (let [response (async/<! (sqs/change-visibility-one client msg 30))]
             (when (utils/anomaly? response)
               (log/error "Error extending visibility timeout of inflight message." (pr-str response)))
-            (recur (utils/with-deadline msg (- (* 30 1000) 400)) task)))))))
+            (recur (utils/with-deadline msg (- (* 30 1000) 2000)) task)))))))
 
 (defn- ->processor
   "Turns a function with unknown behavior into a predictable

@@ -29,10 +29,11 @@
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
          (let [request {:op      :ChangeMessageVisibilityBatch
                         :request {:QueueUrl queue-url
-                                  :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
-                                              {:Id                MessageId
-                                               :ReceiptHandle     ReceiptHandle
-                                               :VisibilityTimeout visibility-timeout})}}]
+                                  :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
+                                                   {:Id                MessageId
+                                                    :ReceiptHandle     ReceiptHandle
+                                                    :VisibilityTimeout visibility-timeout})
+                                                 (utils/distinct-by :Id))}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
 
@@ -48,10 +49,10 @@
          (let [request
                {:op      :DeleteMessageBatch
                 :request {:QueueUrl queue-url
-                          :Entries  (distinct
-                                      (for [{:keys [MessageId ReceiptHandle]} messages]
-                                        {:Id            MessageId
-                                         :ReceiptHandle ReceiptHandle}))}}]
+                          :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
+                                           {:Id            MessageId
+                                            :ReceiptHandle ReceiptHandle})
+                                         (utils/distinct-by :Id))}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
 

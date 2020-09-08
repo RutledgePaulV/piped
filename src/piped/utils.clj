@@ -9,7 +9,7 @@
 (def maximum-messages-received 10)
 (def minimum-wait-time-seconds 0)
 (def maximum-wait-time-seconds 20)
-(def deadline-safety-buffer 400)
+(def deadline-safety-buffer 2000)
 
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
@@ -53,6 +53,32 @@
            (take-while #(< % max)))
       (repeat max))
     (map (fn [x] (+ x (rand-int 1000))))))
+
+(defn distinct-by
+  "Like distinct but according to a key-fn instead of the element itself."
+  ([f]
+   (fn [rf]
+     (let [seen (volatile! #{})]
+       (fn
+         ([] (rf))
+         ([result] (rf result))
+         ([result x]
+          (let [fx (f x) k (hash fx)]
+            (if (contains? @seen k)
+              result
+              (do (vswap! seen conj k)
+                  (rf result x)))))))))
+  ([f coll]
+   (let [step (fn step [xs seen]
+                (lazy-seq
+                  ((fn [[x :as xs] seen]
+                     (when-let [s (seq xs)]
+                       (let [fx (f x) k (hash fx)]
+                         (if (contains? seen k)
+                           (recur (rest s) seen)
+                           (cons x (step (rest s) (conj seen k)))))))
+                   xs seen)))]
+     (step coll #{}))))
 
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
