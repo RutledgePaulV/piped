@@ -6,20 +6,34 @@
             [piped.actions :as actions]
             [piped.utils :as utils]))
 
+(defprotocol PipedSystem
+  (start [this] "Start polling SQS and processing messages.")
+  (stop [this] "Stop the system and await completion of in-flight messages."))
+
 ; system registry
 (defonce systems (atom {}))
 
 (defn stop-system
   "For a given queue-url, stop the associated system (if any)."
-  [key]
-  (let [[old] (swap-vals! systems dissoc key)]
-    (some-> old (get key) (async/close!))))
+  [queue-url]
+  (when-some [system (get @systems queue-url)]
+    (stop system)))
+
+(defn start-system
+  "For a given queue-url, start the associated system (if any)."
+  [queue-url]
+  (when-some [system (get @systems queue-url)]
+    (start system)))
+
+(defn start-all-systems
+  "Stop all running systems."
+  []
+  (run! stop (vals @systems)))
 
 (defn stop-all-systems
   "Stop all running systems."
   []
-  (doseq [v (vals (first (reset-vals! systems {})))]
-    (async/close! v)))
+  (run! start (vals @systems)))
 
 (defn spawn-system
   "Spawns a set of producers and consumers for a given queue.
@@ -66,31 +80,46 @@
              (spawn-nacker []
                (actions/spawn-nacker client nacker-batched))]
 
-       (let [producers (doall (repeatedly producer-parallelism spawn-producer))
-             consumers (doall (repeatedly consumer-parallelism spawn-consumer))
-             ackers    (doall (repeatedly acker-parallelism spawn-acker))
-             nackers   (doall (repeatedly nacker-parallelism spawn-nacker))
-             shutdown  (fn [internal?]
-                         ; remove it from the registry, it's coming down
-                         (when-not internal?
-                           (swap! systems dissoc queue-url))
-                         ; stop the flow of data from producers to consumers
-                         (async/close! pipe)
-                         ; wait for producers to exit
-                         (run! async/<!! producers)
-                         ; wait for consumers to exit
-                         (run! async/<!! consumers)
-                         ; wait for ackers to exit
-                         (async/close! acker-chan)
-                         (run! async/<!! ackers)
-                         ; wait for nackers to exit
-                         (async/close! nacker-chan)
-                         (run! async/<!! nackers))]
+       (let [processes
+             (delay {:producers (doall (repeatedly producer-parallelism spawn-producer))
+                     :consumers (doall (repeatedly consumer-parallelism spawn-consumer))
+                     :ackers    (doall (repeatedly acker-parallelism spawn-acker))
+                     :nackers   (doall (repeatedly nacker-parallelism spawn-nacker))})
 
-         (let [[old] (swap-vals! systems assoc queue-url shutdown)]
-           (when-some [shutdown-for-old-system (get old queue-url)]
-             (shutdown-for-old-system true)))
+             shutdown-thread
+             (Thread.
+               ^Runnable
+               (fn []
+                 (when (realized? processes)
+                   (let [{:keys [producers consumers ackers nackers]} (force processes)]
+                     ; stop the flow of data from producers to consumers
+                     (async/close! pipe)
+                     ; wait for producers to exit
+                     (run! async/<!! producers)
+                     ; wait for consumers to exit
+                     (run! async/<!! consumers)
+                     ; wait for ackers to exit
+                     (async/close! acker-chan)
+                     (run! async/<!! ackers)
+                     ; wait for nackers to exit
+                     (async/close! nacker-chan)
+                     (run! async/<!! nackers)))))
 
-         (fn [] (shutdown false)))))))
+             system
+             (reify PipedSystem
+               (start [this]
+                 (.addShutdownHook (Runtime/getRuntime) shutdown-thread)
+                 (force processes)
+                 this)
+               (stop [this]
+                 (.removeShutdownHook (Runtime/getRuntime) shutdown-thread)
+                 (.run shutdown-thread)
+                 this))]
+
+         (swap! systems assoc queue-url system)
+
+         system)))))
+
+
 
 

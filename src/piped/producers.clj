@@ -97,7 +97,7 @@
                              utils/minimum-messages-received
                              utils/maximum-messages-received
                              (utils/average- accepted wanted))]
-             (log/debugf "Consumers were unable to accept new messages from %s before the messages expired." queue-url)
+             (log/warnf "Consumers were unable to accept %d messages from %s before the messages expired." queue-url (count remainder))
              ; probably just let aws handle it since already very near expiry
              #_(async/onto-chan! nack-chan remainder false)
              (recur new-count []))
