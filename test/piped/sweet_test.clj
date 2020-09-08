@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all])
   (:require [piped.sweet :refer [defprocessor]]
             [piped.core :as piped]
-            [piped.support :as support]))
+            [piped.support :as support]
+            [clojure.tools.logging :as log]))
 
 
 (comment
@@ -10,19 +11,24 @@
     (support/create-queue (support/gen-queue-name)))
 
   (defprocessor my-processor [{:keys [Body]}]
-    {:queue-url queue-url
-     :client    (force support/client)}
+    {:queue-url            queue-url
+     :producer-parallelism 5
+     :consumer-parallelism 50
+     :client               support/client}
     (get Body :kind))
 
-  (defmethod my-processor :alert [{:keys [Body]}]
-    (println "Alert!" (get Body :message))
-    (println (.getName (Thread/currentThread))))
+  (defmethod my-processor :alert [{{:keys [message]} :Body}]
+    (Thread/sleep 500)
+    (log/error message))
 
-  (defmethod my-processor :warn [{:keys [Body]}]
-    (println "Warning!" (get Body :message))
-    (println (.getName (Thread/currentThread))))
+  (defmethod my-processor :warn [{{:keys [message]} :Body}]
+    (Thread/sleep 1000)
+    (log/warn message))
+
+  (dotimes [_ 100]
+    (support/send-message queue-url {:kind :alert :message "The building is on fire!"})
+    (support/send-message queue-url {:kind :warn :message "You better do your homework!"}))
 
   (piped/start #'my-processor)
-  (support/send-message queue-url {:kind :alert :message "The building is on fire!"})
-  (support/send-message queue-url {:kind :warn :message "You better do your homework!"})
+
   (piped/stop #'my-processor))

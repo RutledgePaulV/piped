@@ -20,13 +20,17 @@
      (let [attrs#  ~attributes
            var#    (defmulti* ~symbol (fn ~bindings ~@body))
            system# (if-some [existing# (some-> var# meta ::system)]
-                     (do (piped/stop existing#) (piped/create-system (assoc attrs# :consumer-fn (deref var#))))
+                     (let [was-running# (piped/running? existing#)]
+                       (do (piped/stop existing#)
+                           (cond-> (piped/create-system (assoc attrs# :consumer-fn (deref var#)))
+                             was-running# (piped/start))))
                      (piped/create-system (assoc attrs# :consumer-fn var#)))]
        (defmethod ~symbol :default [msg#]
          (log/warnf "Received unfamiliar message %s. Message will be nacked." (get msg# :MessageId))
          :nack)
-       (let [metadata# {::system     system#
-                        `piped/start (fn [& args#] (piped/start system#))
-                        `piped/stop  (fn [& args#] (piped/stop system#))}]
+       (let [metadata# {::system        system#
+                        `piped/running? (fn [& args#] (piped/running? system#))
+                        `piped/start    (fn [& args#] (piped/start system#))
+                        `piped/stop     (fn [& args#] (piped/stop system#))}]
          (alter-meta! var# merge metadata#))
        var#)))

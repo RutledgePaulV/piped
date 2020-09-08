@@ -11,7 +11,8 @@
 (defprotocol PipedSystem
   :extend-via-metadata true
   (start [this] "Start polling SQS and processing messages.")
-  (stop [this] "Stop the system and await completion of in-flight messages."))
+  (stop [this] "Stop the system and await completion of in-flight messages.")
+  (running? [this] "Is the system currently running?"))
 
 ; system registry
 (defonce systems (atom {}))
@@ -69,73 +70,97 @@
             nacker-parallelism   2
             blocking-consumers   true}}]
 
-   (let [client         (or client (default-client))
-         transform      (or transform default-transform)
-         acker-chan     (async/chan 10)
-         nacker-chan    (async/chan 10)
-         pipe           (async/chan)
-         transformed    (async/map transform [pipe])
-         acker-batched  (utils/deadline-batching acker-chan 10 utils/message->deadline)
-         nacker-batched (utils/batching nacker-chan 5000 10)]
 
-     (letfn [(spawn-producer []
-               (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
-                 (producers/spawn-producer client queue-url pipe nacker-chan opts)))
+   (letfn [(launch []
+             (let [client         (or (force client) (default-client))
+                   transform      (or transform default-transform)
+                   acker-chan     (async/chan 10)
+                   nacker-chan    (async/chan 10)
+                   pipe           (async/chan)
+                   transformed    (async/map transform [pipe])
+                   acker-batched  (utils/deadline-batching acker-chan 10 utils/message->deadline)
+                   nacker-batched (utils/batching nacker-chan 5000 10)]
 
-             (spawn-consumer []
-               (if blocking-consumers
-                 (consumers/spawn-consumer-blocking client transformed acker-chan nacker-chan consumer-fn)
-                 (consumers/spawn-consumer-compute client transformed acker-chan nacker-chan consumer-fn)))
+               (letfn [(spawn-producer []
+                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
+                           (producers/spawn-producer client queue-url pipe nacker-chan opts)))
 
-             (spawn-acker []
-               (actions/spawn-acker client acker-batched))
+                       (spawn-consumer []
+                         (if blocking-consumers
+                           (consumers/spawn-consumer-blocking client transformed acker-chan nacker-chan consumer-fn)
+                           (consumers/spawn-consumer-compute client transformed acker-chan nacker-chan consumer-fn)))
 
-             (spawn-nacker []
-               (actions/spawn-nacker client nacker-batched))]
+                       (spawn-acker []
+                         (actions/spawn-acker client acker-batched))
 
-       (let [processes
-             (delay {:producers (doall (repeatedly producer-parallelism spawn-producer))
-                     :consumers (doall (repeatedly consumer-parallelism spawn-consumer))
-                     :ackers    (doall (repeatedly acker-parallelism spawn-acker))
-                     :nackers   (doall (repeatedly nacker-parallelism spawn-nacker))})
+                       (spawn-nacker []
+                         (actions/spawn-nacker client nacker-batched))]
 
-             shutdown-thread
-             (Thread.
-               ^Runnable
-               (fn []
-                 (when (realized? processes)
-                   (let [{:keys [producers consumers ackers nackers]} (force processes)]
-                     ; signal producers and consumers
-                     (async/close! pipe)
-                     ; wait for producers to exit
-                     (run! async/<!! producers)
-                     ; wait for consumers to exit
-                     (run! async/<!! consumers)
-                     ; signal ackers
-                     (async/close! acker-chan)
-                     ; wait for ackers to exit
-                     (run! async/<!! ackers)
-                     ; signal nackers
-                     (async/close! nacker-chan)
-                     ; wait for nackers to exit
-                     (run! async/<!! nackers)))))
+                 {:client         client
+                  :transform      transform
+                  :acker-chan     acker-chan
+                  :nacker-chan    nacker-chan
+                  :pipe           pipe
+                  :transformed    transformed
+                  :acker-batched  acker-batched
+                  :nacker-batched nacker-batched
+                  :producers      (doall (repeatedly producer-parallelism spawn-producer))
+                  :consumers      (doall (repeatedly consumer-parallelism spawn-consumer))
+                  :ackers         (doall (repeatedly acker-parallelism spawn-acker))
+                  :nackers        (doall (repeatedly nacker-parallelism spawn-nacker))})))]
 
-             system
-             (reify PipedSystem
-               (start [this]
-                 (when-not (realized? processes)
+
+     (let [state
+           (atom (delay (launch)))
+
+           shutdown-thread
+           (Thread.
+             ^Runnable
+             (fn []
+               (when (realized? (deref state))
+                 (let [{:keys [pipe
+                               acker-chan
+                               nacker-chan
+                               producers
+                               consumers
+                               ackers
+                               nackers]} (force (deref state))]
+                   ; signal producers and consumers
+                   (async/close! pipe)
+                   ; wait for producers to exit
+                   (run! async/<!! producers)
+                   ; wait for consumers to exit
+                   (run! async/<!! consumers)
+                   ; signal ackers
+                   (async/close! acker-chan)
+                   ; wait for ackers to exit
+                   (run! async/<!! ackers)
+                   ; signal nackers
+                   (async/close! nacker-chan)
+                   ; wait for nackers to exit
+                   (run! async/<!! nackers)))))
+
+           system
+           (reify PipedSystem
+             (start [this]
+               (let [it (deref state)]
+                 (when-not (realized? it)
                    (.addShutdownHook (Runtime/getRuntime) shutdown-thread)
-                   (force processes))
-                 this)
-               (stop [this]
-                 (when (realized? processes)
+                   (force it)))
+               this)
+             (running? [this]
+               (realized? (deref state)))
+             (stop [this]
+               (let [it (deref state)]
+                 (when (realized? it)
                    (.removeShutdownHook (Runtime/getRuntime) shutdown-thread)
-                   (.run shutdown-thread))
-                 this))]
+                   (.run shutdown-thread)
+                   (reset! state (delay (launch)))))
+               this))]
 
-         (swap! systems assoc queue-url system)
+       (swap! systems assoc queue-url system)
 
-         system)))))
+       system))))
 
 
 
