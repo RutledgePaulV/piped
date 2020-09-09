@@ -5,9 +5,7 @@
             [piped.sqs :as sqs]))
 
 (defn spawn-acker
-  "Acks messages in batches. As soon as one of the messages in a batch becomes 'due'
-   then the entire batch is consumed and acked. If 10 messages accumulate before one
-   becomes due then the batch is acked anyways since only 10 at a time can be acked."
+  "Acks messages in batches."
   [client input-chan]
   (async/go-loop []
     (when-some [batch (async/<! input-chan)]
@@ -17,9 +15,7 @@
       (recur))))
 
 (defn spawn-nacker
-  "Nacks messages in batches. By default will accumulate messages to nack every 5
-   seconds or every 10 messages. Nacking is typically not a high priority operation
-   so this is mainly about not making a lot of network calls."
+  "Nacks messages in batches."
   [client input-chan]
   (async/go-loop []
     (when-some [batch (async/<! input-chan)]

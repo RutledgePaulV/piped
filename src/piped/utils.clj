@@ -44,6 +44,9 @@
 (defn dev-null []
   (async/chan (async/dropping-buffer 0)))
 
+(defn channel? [c]
+  (instance? ManyToManyChannel c))
+
 (defn backoff-seq
   "Returns an infinite seq of exponential back-off timeouts with random jitter."
   [max]
@@ -87,29 +90,29 @@
    the message is 'due'"
   [chan max key-fn]
   (let [return (async/chan)]
-    (async/go-loop [mix (async/mix (async/chan)) batch []]
-      (let [timeout (async/muxch* mix)]
-        (if (= max (count batch))
-          (when (async/>! return batch)
-            (recur (async/mix (async/chan)) []))
-          (if-some [result (async/alt! chan ([v] v) timeout ([_] ::timeout) :priority true)]
-            (if (= result ::timeout)
-              (if (not-empty batch)
-                (when (async/>! return batch)
-                  (recur (async/mix (async/chan)) []))
-                (recur (async/mix (async/chan)) []))
-              (let [deadline (key-fn result)]
-                (recur (doto mix (async/admix deadline)) (conj batch result))))
-            (do
-              (when (not-empty batch)
-                (async/>! return batch))
-              (async/close! return))))))
+    (async/go-loop [channels [chan] batch []]
+      (if (= max (count batch))
+        (when (async/>! return batch)
+          (recur [chan] []))
+        (if-some [[value port] (async/alts! channels :priority true)]
+          (if-not (identical? port chan)
+            (if (not-empty batch)
+              (when (async/>! return batch)
+                (recur [chan] []))
+              (recur [chan] []))
+            (if (some? value)
+              (if-some [deadline (key-fn value)]
+                (recur (conj channels deadline) (conj batch value))
+                (recur channels (conj batch value)))
+              (do (when (not-empty batch)
+                    (async/>! return batch))
+                  (async/close! return)))))))
     return))
 
-(defn batching
+(defn interval-batching
   "Partitions the original chan by non-empty time intervals."
   ([chan msecs]
-   (batching chan msecs nil))
+   (interval-batching chan msecs nil))
   ([chan msecs max]
    (let [return (async/chan)]
      (async/go-loop [deadline (async/timeout msecs) batch []]
@@ -130,7 +133,10 @@
              (async/close! return))))
      return)))
 
-(defmacro on-chan-close [chan & body]
+(defmacro on-chan-close
+  "Execute body when the channel is closed. This is immediate upon
+   channel closing and occurs on the same thread that closed chan."
+  [chan & body]
   `(let [id#      (UUID/randomUUID)
          channel# ~chan]
      (add-watch
@@ -139,3 +145,15 @@
          (when (and (false? o#) (true? n#))
            (try ~@body (finally (remove-watch r# id#))))))
      channel#))
+
+(defmacro defmulti*
+  "Like clojure.core/defmulti, but actually updates the dispatch value when you reload it."
+  [symbol dispatch-fn]
+  `(let [dispatch-fun# ~dispatch-fn
+         existing-var# (resolve '~symbol)]
+     (if-some [dispatch# (some-> existing-var# meta ::holder)]
+       (do (vreset! dispatch# dispatch-fun#) existing-var#)
+       (let [holder# (volatile! dispatch-fun#)
+             var#    (defmulti ~symbol (fn [& args#] (apply @holder# args#)))]
+         (alter-meta! var# merge {::holder holder#})
+         var#))))

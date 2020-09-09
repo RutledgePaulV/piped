@@ -39,10 +39,19 @@
   []
   (run! start (vals @systems)))
 
-(defn default-client []
+(defn get-system
+  "Gets the system for a given queue url. Returns nil if there is no such system."
+  [queue-url]
+  (get @systems queue-url))
+
+(defn default-client
+  "Returns an AWS client instance."
+  []
   (aws/client {:api :sqs}))
 
-(defn default-transform [message]
+(defn default-transform
+  "A function that parses a message body as edn data"
+  [message]
   (update message :Body edn/read-string))
 
 (defn create-system
@@ -79,7 +88,7 @@
                    pipe           (async/chan)
                    transformed    (async/map transform [pipe])
                    acker-batched  (utils/deadline-batching acker-chan 10 utils/message->deadline)
-                   nacker-batched (utils/batching nacker-chan 5000 10)]
+                   nacker-batched (utils/interval-batching nacker-chan 5000 10)]
 
                (letfn [(spawn-producer []
                          (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
@@ -88,7 +97,7 @@
                        (spawn-consumer []
                          (if blocking-consumers
                            (consumers/spawn-consumer-blocking client transformed acker-chan nacker-chan consumer-fn)
-                           (consumers/spawn-consumer-compute client transformed acker-chan nacker-chan consumer-fn)))
+                           (consumers/spawn-consumer-async client transformed acker-chan nacker-chan consumer-fn)))
 
                        (spawn-acker []
                          (actions/spawn-acker client acker-batched))

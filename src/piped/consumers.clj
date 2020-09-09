@@ -51,25 +51,42 @@
         :nack))))
 
 
-(defn spawn-consumer-compute
-  "Spawns a consumer fit for synchronous cpu bound tasks. Uses a core.async dispatch thread when processing a message.
+(defn spawn-consumer-async
+  "Spawns a consumer fit for cpu bound or asynchronous tasks. Uses the core.async dispatch thread pool.
 
     :client        - an aws-api sqs client instance
-    :producer-chan - a channel of incoming sqs messages
-    :processor     - a function of a message that runs pure computation on the message
-
+    :input-chan    - a channel of incoming sqs messages
+    :ack-chan      - a channel that accepts messages that should be acked
+    :nack-chan     - a channel that accepts messages that should be nacked
+    :processor     - a function of a message that either returns a result directly
+                     or may return a core.async channel that emits once (like a
+                     promise chan) when finished processing the message. Must not
+                     block.
   "
   [client input-chan ack-chan nack-chan processor]
   (make-consumer client input-chan ack-chan nack-chan
-    (let [lifted (->processor processor)]
-      (fn [msg] (async/go (lifted msg))))))
+    (let [lifted (->processor identity)]
+      (fn [msg]
+        (async/map
+          lifted
+          [(async/go
+             (try
+               (let [result (processor msg)]
+                 (if (utils/channel? result)
+                   (async/<! result)
+                   result))
+               (catch Exception e
+                 (log/error e "Exception processing sqs message in async consumer.")
+                 :nack)))])))))
 
 
 (defn spawn-consumer-blocking
   "Spawns a consumer fit for synchronous blocking tasks. Uses a dedicated thread when processing a message.
 
     :client        - an aws-api sqs client instance
-    :producer-chan - a channel of incoming sqs messages
+    :input-chan    - a channel of incoming sqs messages
+    :ack-chan      - a channel that accepts messages that should be acked
+    :nack-chan     - a channel that accepts messages that should be nacked
     :processor     - a function of a message that may perform blocking side effects with the message
 
   "
