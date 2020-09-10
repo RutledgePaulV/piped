@@ -34,13 +34,6 @@ the message will both be nacked and count towards circuit breaking. If anything 
 returned then the message will be acked. If you have multiple kinds of messages in your queue 
 a multimethod is a good choice.
 
-#### Middleware
-
-Nothing is provided for this, but you may certainly add a transducer to your pipe to transform 
-(parse) messages prior to processing them. Remember that filtering a message out means it won't
-be acked (never reaches the consumers or processing function) and will just be re-enqueued by 
-SQS once the visibility timeout expires.
-
 #### System
 
 A set of producers, consumers, and a pipe.
@@ -90,18 +83,11 @@ Uses [cognitect's AWS client](https://github.com/cognitect-labs/aws-api) for a m
 #### Supports both Blocking IO and CPU Bound processors
 Uses core.async for the internal machinery, but as a consumer you should be free to perform side effects, and you are.
 
-#### Backpressure
-If your consumer isn't keeping up, producers will read less frequently from SQS in order to match your consumption rate.
-
-#### Circuit Breaking
-If a consumer begins throwing on everything they process, piped exerts back pressure to read from SQS less often. No sense
-in reading a bunch of messages just to nack them all.
-
 #### Lease Extensions
 If your consumer is still working on a message as it nears its visibility timeout, piped will extend the visibility timeout
 for you instead of risking that another worker will start processing the same message.
 
-#### SQS Rate Matching
+#### Backpressure / SQS Rate Matching
 When your consumer and SQS are both speeding along, producers will start polling SQS in a tighter loop. If SQS is 
 barely producing messages, then producers will poll SQS in a longer loop to decrease your costs.
 
