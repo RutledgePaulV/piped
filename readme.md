@@ -47,7 +47,7 @@ A set of producers, consumers, and a pipe.
 ; defines a multimethod and a core.async system 
 ; for polling and processing messages
 (defmultiprocessor my-processor [{:keys [Body]}]
-  {:queue-url            queue-url
+  {:queue-url            "http://localhost:4576/queue/piped-test-queue17184"
    :consumer-parallelism 50
    ; there are more options supported here, like defining
    ; your own aws client if not using ambient credentials
