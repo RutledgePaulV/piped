@@ -1,10 +1,9 @@
 [![Build Status](https://travis-ci.com/rutledgepaulv/piped.svg?branch=master)](https://travis-ci.com/rutledgepaulv/piped)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/piped.svg)](https://clojars.org/org.clojars.rutledgepaulv/piped)
 
-A Clojure library for building applications that leverage Amazon's SQS by adapting between AWS and core.async primitives. 
-AWS only provides a polling and bursty API but core.async is best as a continuous stream. Bridging from one to another in 
-a way that achieves superior resilience and performance properties with minimal configuration is the chief goal 
-of **piped**.
+A Clojure library that enables applications to consume Amazon's Simple Queue Service (SQS) with minimal 
+ceremony while achieving superior resilience and performance properties. Uses core.async behind the scenes 
+to construct an efficient message processing system fed by SQS and provides easy high level Clojure APIs on top.
 
 ## Concepts
 
@@ -20,19 +19,18 @@ short and long polling based on the throughput and backpressure of your system.
 #### Consumers
 
 These read SQS messages from a channel and hand them to your message processing function. Consumers 
-then supervise the message processing in order to extend visibility timeouts, trip circuits, 
-nack failed messages, and ack messages that were processed successfully. Compute consumers 
-run your processing function on one of the go-block dispatch threads and should only be used for 
-cpu-bound tasks. Blocking consumers run your processing function on a dedicated thread and should 
-be used for blocking-io. Blocking consumers are the default when you create a system.
+then supervise the message processing in order to extend visibility timeouts, nack failed messages, 
+and ack messages that were processed successfully. Async/compute consumers run your processing function 
+on one of the go-block dispatch threads and should only be used for cpu-bound tasks. Blocking consumers 
+run your processing function on a dedicated thread and should be used for blocking-io. Blocking consumers
+are the default when you create a system.
 
 #### Message Processing Function
 
 This is the code that you write. It receives a message and can do whatever it wants with it. 
 If `:ack` or `:nack` are returned, the message will be acked or nacked. If an exception is thrown 
-the message will both be nacked and count towards circuit breaking. If anything else is 
-returned then the message will be acked. If you have multiple kinds of messages in your queue 
-a multimethod is a good choice.
+the message will both be nacked and count towards circuit breaking. Any other return values will be 
+acked. When you have multiple kinds of messages in your queue a multimethod is a good choice.
 
 #### System
 
