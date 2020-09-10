@@ -39,19 +39,23 @@
              (async/alt!
                [(api.async/invoke client request)] ([v] v)
                ; if output-chan was closed while we're polling, abandon the poll.
+               ; todo, what about the messages we're going to check out within 20
+               ; seconds from the time we aborted? is exiting quickly in local dev
+               ; scenarios worth paying that price when restarting a prod service?
+               ; is there a way to abort the actual jetty request instead?
                [close-chan] {:closed true})
 
              original-messages
              (get response :Messages [])
 
              deadline
-             (async/timeout (- (* utils/visibility-timeout-seconds 1000) utils/deadline-safety-buffer))
+             (async/timeout (- (* VisibilityTimeout 1000) utils/deadline-safety-buffer))
 
              metadata
-             {:deadline deadline :queue-url queue-url}
+             {:deadline deadline :queue-url queue-url :timeout VisibilityTimeout}
 
              messages-with-metadata
-             (mapv #(with-meta % metadata) original-messages)
+             (mapv #(with-meta % (assoc metadata :raw %)) original-messages)
 
              [action remainder]
              (if (empty? messages-with-metadata)
@@ -78,13 +82,13 @@
 
          (case action
            :error
-           (let [backoffs (if (seq backoff-seq) backoff-seq (utils/backoff-seq MaxArtificialDelay))]
+           (let [backoffs (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
              (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
              (async/<! (async/timeout (first backoffs)))
              (recur max-number-of-messages (rest backoffs)))
 
            :empty
-           (let [backoffs (if (seq backoff-seq) backoff-seq (utils/backoff-seq MaxArtificialDelay))]
+           (let [backoffs (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
              (log/debugf "Empty response when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
              (async/<! (async/timeout (first backoffs)))
              (recur max-number-of-messages (rest backoffs)))
@@ -97,8 +101,8 @@
                              utils/minimum-messages-received
                              utils/maximum-messages-received
                              (utils/average- accepted wanted))]
-             (log/debugf "Consumers were unable to accept new messages from %s before the messages expired." queue-url)
-             ; probably just let aws handle it since already very near expiry
+             (log/warnf "Consumers were unable to accept %d messages from %s before the messages expired." (count remainder) queue-url)
+             ; probably just let aws handle it and skip the network traffic since already very near expiry
              #_(async/onto-chan! nack-chan remainder false)
              (recur new-count []))
 

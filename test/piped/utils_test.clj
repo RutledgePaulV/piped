@@ -1,17 +1,13 @@
 (ns piped.utils-test
-  (:require [clojure.test :refer :all])
   (:require [piped.utils :refer :all]
-            [clojure.core.async :as async]))
-
-
-(defn deadline-chan [millis]
-  (async/go (async/<! (async/timeout millis)) :timeout))
+            [clojure.core.async :as async]
+            [clojure.test :refer :all]))
 
 (deftest deadline-batching-test
   (let [received (atom [])
-        msg1     {:data 1 :deadline (deadline-chan 3500)}
-        msg2     {:data 2 :deadline (deadline-chan 4000)}
-        msg3     {:data 3 :deadline (deadline-chan 5000)}
+        msg1     {:data 1 :deadline (async/timeout 3500)}
+        msg2     {:data 2 :deadline (async/timeout 4000)}
+        msg3     {:data 3 :deadline (async/timeout 5000)}
         chan     (async/chan)
         return   (deadline-batching chan 5 :deadline)]
 
@@ -29,13 +25,13 @@
     (is (= 3 (count (first (deref received)))))))
 
 
-(deftest batching-test
+(deftest interval-batching-test
   (let [received (atom [])
         msg1     {:data 1}
         msg2     {:data 2}
         msg3     {:data 3}
         chan     (async/chan)
-        return   (batching chan 5000 5)]
+        return   (interval-batching chan 5000 5)]
 
     (async/go-loop []
       (when-some [item (async/<! return)]

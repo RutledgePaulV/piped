@@ -5,9 +5,10 @@
             [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
-  (if (= 1 (count result-chans))
+  (if (= 1 (bounded-count 2 result-chans))
     (first result-chans)
-    (async/go-loop [channels (set result-chans) results {:Successful [] :Failed []}]
+    (async/go-loop [channels (set result-chans)
+                    results {:Successful [] :Failed []}]
       (if (empty? channels)
         results
         (let [[value port] (async/alts! (vec channels))]
@@ -28,10 +29,11 @@
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
          (let [request {:op      :ChangeMessageVisibilityBatch
                         :request {:QueueUrl queue-url
-                                  :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
-                                              {:Id                MessageId
-                                               :ReceiptHandle     ReceiptHandle
-                                               :VisibilityTimeout visibility-timeout})}}]
+                                  :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
+                                                   {:Id                MessageId
+                                                    :ReceiptHandle     ReceiptHandle
+                                                    :VisibilityTimeout visibility-timeout})
+                                                 (utils/distinct-by :Id))}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
 
@@ -47,9 +49,10 @@
          (let [request
                {:op      :DeleteMessageBatch
                 :request {:QueueUrl queue-url
-                          :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
-                                      {:Id            MessageId
-                                       :ReceiptHandle ReceiptHandle})}}]
+                          :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
+                                           {:Id            MessageId
+                                            :ReceiptHandle ReceiptHandle})
+                                         (utils/distinct-by :Id))}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
 

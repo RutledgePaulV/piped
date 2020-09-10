@@ -13,7 +13,7 @@
         queue-url  (support/create-queue queue-name)
         received   (promise)
         consumer   (fn [message] (deliver received message))
-        shutdown   (spawn-system @support/client queue-url consumer {:transform transform})
+        system     (start (create-system @support/client queue-url consumer {:transform transform}))
         data       {:value 1}]
     (try
       (support/send-message queue-url data)
@@ -21,4 +21,4 @@
         (is (not= message :aborted))
         (is (= data (get message :Body))))
       (finally
-        (shutdown)))))
+        (stop system)))))

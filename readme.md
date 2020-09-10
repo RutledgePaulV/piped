@@ -43,34 +43,35 @@ A set of producers, consumers, and a pipe.
 
 ```clojure 
 
-(require '[cognitect.aws.client.api :as aws])
+(require '[piped.sweet :refer [defmultiprocessor])
 (require '[piped.core :as piped])
-(require '[clojure.edn :as edn])
 
-(defmulti processor (comp :type :body))
+; defines a multimethod and a core.async system 
+; for polling and processing messages
+(defmultiprocessor my-processor [{:keys [Body]}]
+  {:queue-url            queue-url
+   :consumer-parallelism 50
+   ; there are more options supported here, like defining
+   ; your own aws client if not using ambient credentials
+  }
+  (get Body :kind))
 
-(defmethod processor :hello [{{:keys [recipient message]} :body}]
-    (my.app.email/send-email recipient message))
+; normal clojure defmethod
+(defmethod my-processor :alert [{{:keys [message]} :Body}]
+  (Thread/sleep 500)
+  (log/error message))
 
-(defmethod processor :default [msg] 
-    (println "Received message I'm not prepared to handle!")
-    :nack)
+(defmethod my-processor :warn [{{:keys [message]} :Body}]
+  (Thread/sleep 1000)
+  (log/warn message))
 
-(defn parse-body [msg]
-   (update msg :body edn/read-string))
+; start the core.async system to process messages
+(piped/start #'my-processor)
 
-(def queue-url "https://queue.amazonaws.com/80398EXAMPLE/MyQueue")
-
-(def client (aws/client {:api :sqs}))
-
-(def stop-callback (piped/spawn-system client queue-url processor {:transform parse-body}))
-
-; ... some time later
-
-; stop the system!
-; this will nack any messages that have been received but not yet put into the pipe
-; and will wait for consumers to finish processing messages that are already in the pipe
-(stop-callback)
+; stop the system. blocks until in-flight messages
+; are done and nacks any messages that have been
+; received but haven't started to be processed
+(piped/stop #'my-processor)
 
 ```
 
