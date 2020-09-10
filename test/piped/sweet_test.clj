@@ -1,6 +1,6 @@
 (ns piped.sweet-test
   (:require [clojure.test :refer :all])
-  (:require [piped.sweet :refer [defprocessor]]
+  (:require [piped.sweet :refer :all]
             [piped.core :as piped]
             [piped.support :as support]
             [clojure.tools.logging :as log]))
@@ -10,7 +10,7 @@
   (def queue-url
     (support/create-queue (support/gen-queue-name)))
 
-  (defprocessor my-processor [{:keys [Body]}]
+  (defmultiprocessor my-processor [{:keys [Body]}]
     {:queue-url            queue-url
      :producer-parallelism 5
      :consumer-parallelism 50

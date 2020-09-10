@@ -31,10 +31,16 @@
           ; need to extend visibility of this message because it's still in-flight
           ; we don't want batching for this because immediacy is important here to
           ; avoid the message becoming visible for other consumers
-          (let [response (async/<! (sqs/change-visibility-one client msg 30))]
+          (let [old-timeout (utils/message->timeout msg)
+                new-timeout (* 2 old-timeout)
+                response    (do
+                              (log/infof "Extending visibility for inflight message %s from %d to %d seconds."
+                                         (get msg :MessageId) old-timeout
+                                         new-timeout)
+                              (async/<! (sqs/change-visibility-one client msg new-timeout)))]
             (when (utils/anomaly? response)
               (log/error "Error extending visibility timeout of inflight message." (pr-str response)))
-            (recur (utils/with-deadline msg (- (* 30 1000) 2000)) task)))))))
+            (recur (-> msg (utils/with-deadline (* new-timeout 1000)) (utils/with-timeout new-timeout)) task)))))))
 
 (defn- ->processor
   "Turns a function with unknown behavior into a predictable

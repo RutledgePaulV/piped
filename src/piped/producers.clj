@@ -52,13 +52,10 @@
              (async/timeout (- (* VisibilityTimeout 1000) utils/deadline-safety-buffer))
 
              metadata
-             {:deadline  deadline
-              :queue-url queue-url
-              :timeout   VisibilityTimeout
-              :received  (System/currentTimeMillis)}
+             {:deadline deadline :queue-url queue-url :timeout VisibilityTimeout}
 
              messages-with-metadata
-             (mapv #(with-meta % metadata) original-messages)
+             (mapv #(with-meta % (assoc metadata :raw %)) original-messages)
 
              [action remainder]
              (if (empty? messages-with-metadata)

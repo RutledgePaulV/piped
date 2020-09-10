@@ -17,8 +17,14 @@
 (defn message->deadline [message]
   (some-> message meta :deadline))
 
+(defn message->timeout [message]
+  (some-> message meta :timeout))
+
 (defn with-deadline [message duration]
   (vary-meta message assoc :deadline (async/timeout duration)))
+
+(defn with-timeout [message timeout]
+  (vary-meta message assoc :timeout timeout))
 
 (defn anomaly? [response]
   (contains? response :cognitect.anomalies/category))
