@@ -31,7 +31,7 @@
             :port     (.getMappedPort @localstack 4576)}}]
       (aws/client (merge client-opts localstack-opts)))))
 
-(def client (localstack-client {:api :sqs}))
+(def client (localstack-client {:api :sqs :client 'piped.http/create}))
 
 (defn create-queue [queue-name]
   (let [op {:op      :CreateQueue

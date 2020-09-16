@@ -5,8 +5,9 @@
 
 (defn create
   []
-  (let [c (impl/create {:trust-all          true
-                        :pending-opts-limit 1000})]
+  (let [c (impl/create {:trust-all                       true
+                        :pending-opts-limit              1000
+                        :max-connections-per-destination 1000})]
     (reify aws/HttpClient
       (-submit [_ request channel]
         (impl/submit c request channel))
