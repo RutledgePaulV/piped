@@ -12,8 +12,8 @@
 
   (defmultiprocessor my-processor [{:keys [Body]}]
     {:queue-url            queue-url
-     :producer-parallelism 5
-     :consumer-parallelism 50
+     :producer-parallelism 100
+     :consumer-parallelism 1000
      :client               support/client}
     (get Body :kind))
 
@@ -25,7 +25,7 @@
     (Thread/sleep 1000)
     (log/warn message))
 
-  (dotimes [_ 100]
+  (dotimes [_ 600]
     (support/send-message queue-url {:kind :alert :message "The building is on fire!"})
     (support/send-message queue-url {:kind :warn :message "You better do your homework!"}))
 

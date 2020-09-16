@@ -47,7 +47,7 @@
 (defn default-client
   "Returns an AWS client instance."
   []
-  (aws/client {:api :sqs}))
+  (aws/client {:api :sqs :client 'piped.http/create}))
 
 (defn default-transform
   "A function that parses a message body as edn data"

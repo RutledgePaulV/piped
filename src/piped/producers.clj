@@ -84,6 +84,7 @@
            :error
            (let [backoffs (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
              (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
+             (log/error (pr-str response))
              (async/<! (async/timeout (first backoffs)))
              (recur max-number-of-messages (rest backoffs)))
 
