@@ -1,6 +1,7 @@
 (ns piped.support
   (:require [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds])
+            [cognitect.aws.credentials :as creds]
+            [piped.http :as http])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
            (java.time Duration)))
@@ -31,7 +32,7 @@
             :port     (.getMappedPort @localstack 4576)}}]
       (aws/client (merge client-opts localstack-opts)))))
 
-(def client (localstack-client {:api :sqs :http-client 'piped.http/create}))
+(def client (localstack-client {:api :sqs :http-client (http/create)}))
 
 (defn create-queue [queue-name]
   (let [op {:op      :CreateQueue

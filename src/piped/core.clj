@@ -6,6 +6,7 @@
             [piped.actions :as actions]
             [piped.utils :as utils]
             [cognitect.aws.client.api :as aws]
+            [piped.http :as http]
             [clojure.edn :as edn]))
 
 (defprotocol PipedSystem
@@ -47,7 +48,7 @@
 (defn default-client
   "Returns an AWS client instance."
   []
-  (aws/client {:api :sqs :http-client 'piped.http/create}))
+  (aws/client {:api :sqs :http-client (http/create)}))
 
 (defn default-transform
   "A function that parses a message body as edn data"
