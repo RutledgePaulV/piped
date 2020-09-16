@@ -47,6 +47,9 @@
 (defn average- [& args]
   (long (Math/floor (apply average args))))
 
+(defn quot+ [& nums]
+  (long (Math/ceil (apply / nums))))
+
 (defn dev-null []
   (async/chan (async/dropping-buffer 0)))
 
@@ -92,9 +95,10 @@
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
    the max batch size is reached or one of the messages in the batch has become 'due'
-   for action. key-fn is a function of a message that returns a channel that closes when
-   the message is 'due'"
-  [chan max key-fn]
+   for action. deadline-fn is a function of a message that returns a channel that
+   closes when the message is 'due'. deadline-fn may return nil if a message has no
+   particular urgency."
+  [chan max deadline-fn]
   (let [return (async/chan)]
     (async/go-loop [channels [chan] batch []]
       (if (= max (count batch))
@@ -107,7 +111,7 @@
                 (recur [chan] []))
               (recur [chan] []))
             (if (some? value)
-              (if-some [deadline (key-fn value)]
+              (if-some [deadline (deadline-fn value)]
                 (recur (conj channels deadline) (conj batch value))
                 (recur channels (conj batch value)))
               (do (when (not-empty batch)

@@ -64,31 +64,27 @@
   ([client queue-url consumer-fn]
    (create-system client queue-url consumer-fn {}))
 
-  ([client queue-url consumer-fn
-
-    {:keys [producer-parallelism
-            consumer-parallelism
-            acker-parallelism
-            nacker-parallelism
-            blocking-consumers
-            transform]
-
-     :or   {producer-parallelism 1
-            consumer-parallelism 10
-            acker-parallelism    2
-            nacker-parallelism   2
-            blocking-consumers   true}}]
-
+  ([client queue-url consumer-fn {:keys [producer-parallelism
+                                         consumer-parallelism
+                                         acker-parallelism
+                                         nacker-parallelism
+                                         blocking-consumers
+                                         transform]}]
 
    (letfn [(launch []
-             (let [client         (or (force client) (default-client))
-                   transform      (or transform default-transform)
-                   acker-chan     (async/chan 10)
-                   nacker-chan    (async/chan 10)
-                   pipe           (async/chan)
-                   transformed    (async/map transform [pipe])
-                   acker-batched  (utils/deadline-batching acker-chan 10 utils/message->deadline)
-                   nacker-batched (utils/interval-batching nacker-chan 5000 10)]
+             (let [consumer-parallelism (or consumer-parallelism 10)
+                   blocking-consumers   (if (some? blocking-consumers) blocking-consumers true)
+                   producer-parallelism (or producer-parallelism (utils/quot+ consumer-parallelism 10))
+                   acker-parallelism    (or acker-parallelism producer-parallelism)
+                   nacker-parallelism   (or nacker-parallelism producer-parallelism)
+                   client               (or (force client) (default-client))
+                   transform            (or transform default-transform)
+                   acker-chan           (async/chan)
+                   nacker-chan          (async/chan)
+                   pipe                 (async/chan)
+                   transformed          (async/map transform [pipe])
+                   acker-batched        (utils/deadline-batching acker-chan 10 utils/message->deadline)
+                   nacker-batched       (utils/interval-batching nacker-chan 5000 10)]
 
                (letfn [(spawn-producer []
                          (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
