@@ -18,11 +18,9 @@
     (get Body :kind))
 
   (defmethod my-processor :alert [{{:keys [message]} :Body}]
-    (Thread/sleep 500)
     (log/error message))
 
   (defmethod my-processor :warn [{{:keys [message]} :Body}]
-    (Thread/sleep 1000)
     (log/warn message))
 
   (dotimes [_ 600]
