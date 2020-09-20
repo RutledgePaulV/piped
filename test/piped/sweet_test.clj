@@ -3,7 +3,8 @@
   (:require [piped.sweet :refer :all]
             [piped.core :as piped]
             [piped.support :as support]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [clojure.edn :as edn]))
 
 
 (comment
@@ -14,7 +15,8 @@
     {:queue-url            queue-url
      :producer-parallelism 100
      :consumer-parallelism 1000
-     :client-opts          (support/localstack-client-opts)}
+     :client-opts          (support/localstack-client-opts)
+     :transform            #(update % :Body edn/read-string)}
     (get Body :kind))
 
   (defmethod my-processor :alert [{{:keys [message]} :Body}]
