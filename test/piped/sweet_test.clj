@@ -14,7 +14,7 @@
     {:queue-url            queue-url
      :producer-parallelism 100
      :consumer-parallelism 1000
-     :client               support/client}
+     :client-opts          (support/localstack-client-opts)}
     (get Body :kind))
 
   (defmethod my-processor :alert [{{:keys [message]} :Body}]

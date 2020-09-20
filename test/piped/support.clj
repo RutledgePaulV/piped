@@ -1,10 +1,10 @@
 (ns piped.support
   (:require [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds]
-            [piped.http :as http])
+            [cognitect.aws.credentials :as creds])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
-           (java.time Duration)))
+           (java.time Duration)
+           [java.util UUID]))
 
 (defonce localstack
   (delay
@@ -17,22 +17,20 @@
         (.start))
       container)))
 
-(defn localstack-client [client-opts]
-  (delay
-    (let [localstack-opts
-          {:region
-           "us-east-1"
-           :credentials-provider
+(defn localstack-client-opts []
+  {:api    :sqs
+   :region "us-east-1"
+   :credentials-provider
            (creds/basic-credentials-provider
              {:access-key-id     "localstack"
               :secret-access-key "localstack"})
-           :endpoint-override
+   :endpoint-override
            {:protocol :http
             :hostname (.getContainerIpAddress @localstack)
-            :port     (.getMappedPort @localstack 4576)}}]
-      (aws/client (merge client-opts localstack-opts)))))
+            :port     (.getMappedPort @localstack 4576)}})
 
-(def client (localstack-client {:api :sqs :http-client (http/create)}))
+(def client
+  (delay (aws/client (localstack-client-opts))))
 
 (defn create-queue [queue-name]
   (let [op {:op      :CreateQueue
@@ -44,6 +42,14 @@
             :request {:QueueUrl    queue-url
                       :MessageBody (pr-str value)}}]
     (:MessageId (aws/invoke @client op))))
+
+(defn send-message-batch [queue-url messages]
+  (let [op {:op      :SendMessageBatch
+            :request {:QueueUrl queue-url
+                      :Entries  (for [message messages]
+                                  {:Id          (str (UUID/randomUUID))
+                                   :MessageBody message})}}]
+    (aws/invoke @client op)))
 
 (defn gen-queue-name []
   (name (gensym "piped-test-queue")))

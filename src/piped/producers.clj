@@ -36,14 +36,7 @@
 
              ; poll for messages
              response
-             (async/alt!
-               [(api.async/invoke client request)] ([v] v)
-               ; if output-chan was closed while we're polling, abandon the poll.
-               ; todo, what about the messages we're going to check out within 20
-               ; seconds from the time we aborted? is exiting quickly in local dev
-               ; scenarios worth paying that price when restarting a prod service?
-               ; is there a way to abort the actual jetty request instead?
-               [close-chan] {:closed true})
+             (async/<! (api.async/invoke client request))
 
              original-messages
              (get response :Messages [])
@@ -59,13 +52,10 @@
 
              [action remainder]
              (if (empty? messages-with-metadata)
-               (cond
-                 (utils/anomaly? response)
-                 [:error []]
-                 (true? (get response :closed))
-                 [:closed []]
-                 :else
-                 [:empty []])
+               (cond (utils/anomaly? response)
+                     [:error []]
+                     :else
+                     [:empty []])
                (loop [[message :as messages] messages-with-metadata]
                  (if (seq messages)
                    (if-some [result
@@ -82,17 +72,13 @@
 
          (case action
            :error
-           (let [backoffs (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
-             (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
-             (log/error (pr-str response))
-             (async/<! (async/timeout (first backoffs)))
-             (recur max-number-of-messages (rest backoffs)))
+           (let [[backoff :as backoff-seq] (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
+             (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds. %s" queue-url backoff (pr-str response))
+             (async/<! (async/timeout backoff))
+             (recur max-number-of-messages (rest backoff-seq)))
 
            :empty
-           (let [backoffs (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
-             (log/debugf "Empty response when polling sqs queue %s. Waiting for %d milliseconds." queue-url (first backoffs))
-             (async/<! (async/timeout (first backoffs)))
-             (recur max-number-of-messages (rest backoffs)))
+           (recur max-number-of-messages [])
 
            :dead
            (let [wanted    max-number-of-messages
