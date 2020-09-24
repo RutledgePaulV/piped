@@ -91,7 +91,7 @@
                                          (assoc :api :sqs)
                                          :always
                                          (aws/client))
-                  transform            (or
+                  transform            (if transform
                                          (fn [msg]
                                            (try
                                              (transform msg)
