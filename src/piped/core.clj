@@ -12,46 +12,46 @@
             [clojure.tools.logging :as log]
             [aws-api-credential-providers.core :as cp]))
 
-(defprotocol PipedSystem
+(defprotocol PipedProcessor
   :extend-via-metadata true
   (start [this] "Start polling SQS and processing messages.")
   (stop [this] "Stop the system and await completion of in-flight messages.")
   (running? [this] "Is the system currently running?"))
 
-; system registry
-(defonce systems (atom {}))
+; registry
+(defonce processors (atom {}))
 
-(defn get-system
-  "Gets the system for a given queue url. Returns nil if there is no such system."
-  [queue-url]
-  (get @systems queue-url))
-
-(defn stop-system
-  "For a given queue-url, stop the associated system (if any)."
-  [queue-url]
-  (when-some [system (get-system queue-url)]
-    (stop system)))
-
-(defn start-system
-  "For a given queue-url, start the associated system (if any)."
-  [queue-url]
-  (when-some [system (get-system queue-url)]
-    (start system)))
-
-(defn get-all-systems
+(defn get-all-processors
   "Returns all registered systems in no particular order."
   []
-  (vals @systems))
+  (or (vals @processors) ()))
 
-(defn start-all-systems
+(defn get-processor-by-queue-url
+  "Gets the system for a given queue url. Returns nil if there is no such system."
+  [queue-url]
+  (get @processors queue-url))
+
+(defn start-processor-by-queue-url!
+  "For a given queue-url, start the associated system (if any)."
+  [queue-url]
+  (some-> queue-url (get-processor-by-queue-url) (start)))
+
+(defn stop-processor-by-queue-url!
+  "For a given queue-url, stop the associated system (if any)."
+  [queue-url]
+  (some-> queue-url (get-processor-by-queue-url) (stop)))
+
+(defn start-all-processors!
   "Stop all running systems."
   []
-  (run! start (get-all-systems)))
+  (run! start (get-all-processors)))
 
-(defn stop-all-systems
-  "Stop all running systems."
+(defn stop-all-processors!
+  "Stop all running systems. Systems are stopped concurrently
+   for a faster return but this function blocks until they have
+   all been fully shutdown."
   []
-  (run! stop (get-all-systems)))
+  (run! deref (doall (map #(future (stop %)) (get-all-processors)))))
 
 (defn http-client
   "Returns a http client using cognitect's async jetty client wrapper."
@@ -66,7 +66,9 @@
 (defn processor
   "Spawns a set of producers and consumers for a given queue.
 
-   Returns an implementation of the PipedSystem protocol which represents a system that can be started and stopped."
+   Returns an implementation of the PipedProcessor protocol which
+   represents a message processing machine that can be started and
+   stopped."
   [{:keys [client-opts
            queue-url
            consumer-fn
@@ -179,7 +181,7 @@
                   (aws/stop client)))))
 
           system
-          (reify PipedSystem
+          (reify PipedProcessor
             (start [this]
               (let [it (deref state)]
                 (when-not (realized? it)
@@ -196,7 +198,7 @@
                   (reset! state (delay (launch)))))
               this))]
 
-      (swap! systems assoc queue-url system)
+      (swap! processors assoc queue-url system)
 
       system)))
 

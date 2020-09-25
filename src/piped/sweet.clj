@@ -7,7 +7,7 @@
 (defmacro defmultiprocessor
   "Defines a clojure multimethod and constructs a new piped system from the attribute map.
    The multimethod is used as the consumer function for processing the queue. Multimethod
-   var implements the piped.core/PipedSystem protocol so that the associated system can easily
+   var implements the piped.core/PipedProcessor protocol so that the associated system can easily
    be started and stopped. For supported attributes see piped.core/processor.
 
    Redefining a processor for the same queue will stop the system for the old queue and start
@@ -22,7 +22,7 @@
   [symbol bindings attributes & body]
   `(let [attrs#                 ~attributes
          var#                   (utils/defmulti* ~symbol (fn ~bindings ~@body))
-         queue-system#          (piped/get-system (:queue-url attrs#))
+         queue-system#          (piped/get-processor-by-queue-url (:queue-url attrs#))
          queue-was-running#     (and queue-system# (piped/running? queue-system#))
          processor-system#      (some-> var# meta ::system)
          processor-was-running# (and processor-system# (piped/running? processor-system#))
@@ -59,7 +59,8 @@
 
 (defmacro defprocessor
   "Like defmultiprocessor, but defines a single message handling implementation instead
-   of requiring defining a dynamic dispatch function and separate method implementation."
+   of requiring defining a dynamic dispatch function and separate method implementation
+   for cases when you have a heterogeneous message type or existing dispatch functions."
   [symbol bindings attributes & body]
   `(let [var# (defmultiprocessor ~symbol ~bindings ~attributes :default)]
      (defmethod ~symbol :default ~bindings ~@body)

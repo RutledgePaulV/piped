@@ -4,7 +4,7 @@
             [clojure.edn :as edn]
             [piped.support :as support]))
 
-(use-fixtures :each (fn [tests] (stop-all-systems) (tests) (stop-all-systems)))
+(use-fixtures :each (fn [tests] (stop-all-processors!) (tests) (stop-all-processors!)))
 
 (def transform #(update % :Body edn/read-string))
 
