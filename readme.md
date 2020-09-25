@@ -8,7 +8,7 @@ to construct an efficient message processing system fed by SQS and provides easy
 
 ---
 
-## Features
+### Features
 
 #### Lightweight Async AWS
 Uses [cognitect's AWS client](https://github.com/cognitect-labs/aws-api) for a minimal library footprint and true 
@@ -37,7 +37,7 @@ Most users should only need to provide two things: the queue-url and the maximum
 ---
 
 
-## Normal Function Usage
+### Normal Function Usage
 
 ```clojure 
 
@@ -88,7 +88,7 @@ Most users should only need to provide two things: the queue-url and the maximum
 
 ```
 
-## Syntactic Sugar
+### Syntactic Sugar
 
 ```clojure 
 
@@ -124,7 +124,7 @@ Most users should only need to provide two things: the queue-url and the maximum
 
 ---
 
-## Performance
+### Performance
 
 I will eventually produce some real benchmarks against AWS and perhaps contrast with squeedo but some 
 early testing was showing 600 messages/second of throughput against localstack before localstack became
@@ -134,7 +134,7 @@ the bottleneck.
 ---
 
 
-## Internal Concepts
+### Internal Concepts
 
 #### Pipe
 
@@ -180,13 +180,7 @@ A set of the above abstractions that can be started and stopped.
 
 ---
 
-
-## Acknowledgements
-
-- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of `piped`.
-
-
-## Alternatives
+### Alternatives
 
 [Squeedo](https://github.com/TheClimateCorporation/squeedo)
 
@@ -200,3 +194,11 @@ YMMV.
 
 If you're unaware of the dangers of mixing blocking-io and go blocks, please read [this excellent post](https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/).
 
+### Acknowledgements
+
+- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of `piped`.
+
+
+### License
+
+This project is licensed under [MIT license](http://opensource.org/licenses/MIT).
