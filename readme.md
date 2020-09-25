@@ -194,10 +194,13 @@ YMMV.
 
 If you're unaware of the dangers of mixing blocking-io and go blocks, please read [this excellent post](https://eli.thegreenplace.net/2017/clojure-concurrency-and-blocking-with-coreasync/).
 
+---
+
 ### Acknowledgements
 
 - [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of `piped`.
 
+---
 
 ### License
 
