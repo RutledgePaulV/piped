@@ -40,9 +40,7 @@ Most users should only need to provide two things: the queue-url and the maximum
 ### Normal Function Usage
 
 ```clojure 
-
 (require '[piped.core :as piped])
-(require '[clojure.edn :as edn])
 
 (def opts
   {; *required* 
