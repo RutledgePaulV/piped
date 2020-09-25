@@ -32,9 +32,7 @@ the max batch size is met or one of the messages in the batch is near expiry and
 than waiting for the batch to finish filling up.
 
 #### Minimal Configuration
-Most users should only need to provide three things: queue-url, the maximum concurrency for message processing, and whether
-piped should spawn real threads for your processing (the default) or run your non-blocking process on a core.async dispatch 
-thread.
+Most users should only need to provide two things: the queue-url and the maximum concurrency for message processing.
 
 ---
 
@@ -185,10 +183,8 @@ A set of the above abstractions that can be started and stopped.
 
 ## Acknowledgements
 
-- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of Piped.
+- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of `piped`.
 
-
----
 
 ## Alternatives
 
