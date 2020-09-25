@@ -9,7 +9,8 @@
             [cognitect.aws.http :as http]
             [cognitect.http-client :as impl]
             [piped.specs :as specs]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [aws-api-credential-providers.core :as cp]))
 
 (defprotocol PipedSystem
   :extend-via-metadata true
@@ -81,12 +82,16 @@
                   acker-parallelism    (or acker-parallelism producer-parallelism)
                   nacker-parallelism   (or nacker-parallelism producer-parallelism)
                   max-http-ops         (+ producer-parallelism acker-parallelism nacker-parallelism)
+                  http-client          (delay (http-client
+                                                {:pending-ops-limit               max-http-ops
+                                                 :max-connections-per-destination max-http-ops}))
+                  credentials-provider (delay (cp/default-credentials-provider
+                                                (or (:http-client client-opts) (force http-client))))
                   client               (cond-> (or client-opts {})
                                          (not (contains? client-opts :http-client))
-                                         (assoc :http-client
-                                                (http-client
-                                                  {:pending-ops-limit               max-http-ops
-                                                   :max-connections-per-destination max-http-ops}))
+                                         (assoc :http-client (force http-client))
+                                         (not (contains? client-opts :credentials-provider))
+                                         (assoc :credentials-provider (force credentials-provider))
                                          :always
                                          (assoc :api :sqs)
                                          :always

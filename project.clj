@@ -29,6 +29,7 @@
    [com.cognitect.aws/api "0.8.474"]
    [com.cognitect.aws/endpoints "1.1.11.842"]
    [com.cognitect.aws/sqs "801.2.702.0"]
+   [org.clojars.rutledgepaulv/aws-api-credential-providers "0.1.0"]
    [org.clojure/core.async "1.3.610"]
    [org.clojure/tools.logging "1.1.0"]]
 
