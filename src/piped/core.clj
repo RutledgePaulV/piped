@@ -21,32 +21,37 @@
 ; system registry
 (defonce systems (atom {}))
 
+(defn get-system
+  "Gets the system for a given queue url. Returns nil if there is no such system."
+  [queue-url]
+  (get @systems queue-url))
+
 (defn stop-system
   "For a given queue-url, stop the associated system (if any)."
   [queue-url]
-  (when-some [system (get @systems queue-url)]
+  (when-some [system (get-system queue-url)]
     (stop system)))
 
 (defn start-system
   "For a given queue-url, start the associated system (if any)."
   [queue-url]
-  (when-some [system (get @systems queue-url)]
+  (when-some [system (get-system queue-url)]
     (start system)))
+
+(defn get-all-systems
+  "Returns all registered systems in no particular order."
+  []
+  (vals @systems))
 
 (defn start-all-systems
   "Stop all running systems."
   []
-  (run! stop (vals @systems)))
+  (run! start (get-all-systems)))
 
 (defn stop-all-systems
   "Stop all running systems."
   []
-  (run! start (vals @systems)))
-
-(defn get-system
-  "Gets the system for a given queue url. Returns nil if there is no such system."
-  [queue-url]
-  (get @systems queue-url))
+  (run! stop (get-all-systems)))
 
 (defn http-client
   "Returns a http client using cognitect's async jetty client wrapper."
@@ -58,10 +63,10 @@
       (-stop [_]
         (impl/stop c)))))
 
-(defn create-system
+(defn processor
   "Spawns a set of producers and consumers for a given queue.
 
-   Returns a function of no arguments that can be called to stop the system."
+   Returns an implementation of the PipedSystem protocol which represents a system that can be started and stopped."
   [{:keys [client-opts
            queue-url
            consumer-fn

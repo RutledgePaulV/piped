@@ -13,7 +13,7 @@
         queue-url  (support/create-queue queue-name)
         received   (promise)
         consumer   (fn [message] (deliver received message))
-        system     (start (create-system
+        system     (start (processor
                             {:consumer-fn consumer
                              :queue-url   queue-url
                              :client-opts (support/localstack-client-opts)
