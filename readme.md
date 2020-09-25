@@ -198,7 +198,7 @@ If you're unaware of the dangers of mixing blocking-io and go blocks, please rea
 
 ### Acknowledgements
 
-- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires of `piped`.
+- [Konrad Tallman](https://github.com/komcrad) for teaching me about SQS these last months and helping kick the tires.
 
 ---
 
