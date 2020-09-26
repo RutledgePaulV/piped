@@ -9,7 +9,6 @@
             [cognitect.aws.http :as http]
             [cognitect.http-client :as impl]
             [piped.specs :as specs]
-            [clojure.tools.logging :as log]
             [aws-api-credential-providers.core :as cp]))
 
 (defprotocol PipedProcessor
@@ -72,12 +71,12 @@
   [{:keys [client-opts
            queue-url
            consumer-fn
+           transform-fn
            producer-parallelism
            consumer-parallelism
            acker-parallelism
            nacker-parallelism
-           blocking-consumers
-           transform]
+           blocking-consumers]
     :as   opts}]
 
   (specs/assert-options opts)
@@ -103,20 +102,12 @@
                                          (assoc :api :sqs)
                                          :always
                                          (aws/client))
-                  transform            (if transform
-                                         (fn [msg]
-                                           (try
-                                             (transform msg)
-                                             (catch Exception e
-                                               (log/error e "Error in transformer.")
-                                               msg)))
-                                         identity)
                   acker-chan           (async/chan)
                   nacker-chan          (async/chan)
                   pipe                 (async/chan)
-                  transformed          (async/map transform [pipe])
-                  acker-batched        (utils/deadline-batching acker-chan 10 utils/message->deadline)
-                  nacker-batched       (utils/interval-batching nacker-chan 5000 10)]
+                  acker-batched        (utils/deadline-batching acker-chan 10)
+                  nacker-batched       (utils/interval-batching nacker-chan 5000 10)
+                  composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)]
 
               (letfn [(spawn-producer []
                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
@@ -124,8 +115,8 @@
 
                       (spawn-consumer []
                         (if blocking-consumers
-                          (consumers/spawn-consumer-blocking client transformed acker-chan nacker-chan consumer-fn)
-                          (consumers/spawn-consumer-async client transformed acker-chan nacker-chan consumer-fn)))
+                          (consumers/spawn-consumer-blocking client pipe acker-chan nacker-chan composed-consumer)
+                          (consumers/spawn-consumer-async client pipe acker-chan nacker-chan composed-consumer)))
 
                       (spawn-acker []
                         (actions/spawn-acker client acker-batched))
@@ -134,11 +125,9 @@
                         (actions/spawn-nacker client nacker-batched))]
 
                 {:client         client
-                 :transform      transform
                  :acker-chan     acker-chan
                  :nacker-chan    nacker-chan
                  :pipe           pipe
-                 :transformed    transformed
                  :acker-batched  acker-batched
                  :nacker-batched nacker-batched
                  :producers      (doall (repeatedly producer-parallelism spawn-producer))

@@ -5,14 +5,11 @@
             [clojure.core.async :as async]))
 
 (deftest basic-producer
-  (let [queue-name
-        (support/gen-queue-name)
-        queue-url
-        (support/create-queue queue-name)
-        producer
-        (async/chan)]
+  (let [queue-name (support/gen-queue-name)
+        queue-url  (support/create-queue queue-name)
+        producer   (async/chan)]
     (try
-      (spawn-producer @support/client queue-url producer)
+      (spawn-producer @support/client queue-url producer (support/dev-null))
       (is (nil? (async/poll! producer)))
       (let [message-id (support/send-message queue-url {:value 1})
             message    (async/<!! producer)]

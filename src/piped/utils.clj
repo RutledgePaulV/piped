@@ -4,10 +4,8 @@
   (:import [clojure.core.async.impl.channels ManyToManyChannel]
            [java.util UUID]))
 
-(def visibility-timeout-seconds 30)
 (def minimum-messages-received 1)
 (def maximum-messages-received 10)
-(def minimum-wait-time-seconds 0)
 (def maximum-wait-time-seconds 20)
 (def deadline-safety-buffer 2000)
 
@@ -16,6 +14,9 @@
 
 (defn message->deadline [message]
   (some-> message meta :deadline))
+
+(defn message->identifier [message]
+  (or (some-> message :MessageId) (str (UUID/randomUUID))))
 
 (defn message->timeout [message]
   (some-> message meta :timeout))
@@ -50,9 +51,6 @@
 (defn quot+ [& nums]
   (long (Math/ceil (apply / nums))))
 
-(defn dev-null []
-  (async/chan (async/dropping-buffer 0)))
-
 (defn channel? [c]
   (instance? ManyToManyChannel c))
 
@@ -66,56 +64,30 @@
       (repeat max))
     (map (fn [x] (+ x (rand-int 1000))))))
 
-(defn distinct-by
-  "Like distinct but according to a key-fn instead of the element itself."
-  ([f]
-   (fn [rf]
-     (let [seen (volatile! #{})]
-       (fn
-         ([] (rf))
-         ([result] (rf result))
-         ([result x]
-          (let [fx (f x) k (hash fx)]
-            (if (contains? @seen k)
-              result
-              (do (vswap! seen conj k)
-                  (rf result x)))))))))
-  ([f coll]
-   (let [step (fn step [xs seen]
-                (lazy-seq
-                  ((fn [[x :as xs] seen]
-                     (when-let [s (seq xs)]
-                       (let [fx (f x) k (hash fx)]
-                         (if (contains? seen k)
-                           (recur (rest s) seen)
-                           (cons x (step (rest s) (conj seen k)))))))
-                   xs seen)))]
-     (step coll #{}))))
-
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
    the max batch size is reached or one of the messages in the batch has become 'due'
    for action. deadline-fn is a function of a message that returns a channel that
    closes when the message is 'due'. deadline-fn may return nil if a message has no
    particular urgency."
-  [chan max deadline-fn]
+  [chan max]
   (let [return (async/chan)]
-    (async/go-loop [channels [chan] batch []]
+    (async/go-loop [channels [chan] batch {}]
       (if (= max (count batch))
-        (when (async/>! return batch)
-          (recur [chan] []))
+        (when (async/>! return (vals batch))
+          (recur [chan] {}))
         (if-some [[value port] (async/alts! channels :priority true)]
           (if-not (identical? port chan)
-            (if (not-empty batch)
-              (when (async/>! return batch)
-                (recur [chan] []))
-              (recur [chan] []))
+            (if (seq batch)
+              (when (async/>! return (vals batch))
+                (recur [chan] {}))
+              (recur [chan] {}))
             (if (some? value)
-              (if-some [deadline (deadline-fn value)]
-                (recur (conj channels deadline) (conj batch value))
-                (recur channels (conj batch value)))
-              (do (when (not-empty batch)
-                    (async/>! return batch))
+              (if-some [deadline (message->deadline value)]
+                (recur (conj channels deadline) (assoc batch (message->identifier value) value))
+                (recur channels (assoc batch (message->identifier value) value)))
+              (do (when (seq batch)
+                    (async/>! return (vals batch)))
                   (async/close! return)))))))
     return))
 
@@ -125,36 +97,23 @@
    (interval-batching chan msecs nil))
   ([chan msecs max]
    (let [return (async/chan)]
-     (async/go-loop [deadline (async/timeout msecs) batch []]
+     (async/go-loop [deadline (async/timeout msecs) batch {}]
        (if-some [result (async/alt! [chan] ([v] v) [deadline] ::timeout :priority true)]
          (case result
            ::timeout
            (if (empty? batch)
-             (recur (async/timeout msecs) [])
-             (when (async/>! return batch)
-               (recur (async/timeout msecs) [])))
-           (let [new-batch (conj batch result)]
+             (recur (async/timeout msecs) {})
+             (when (async/>! return (vals batch))
+               (recur (async/timeout msecs) {})))
+           (let [new-batch (assoc batch (message->identifier result) result)]
              (if (and max (= max (count new-batch)))
-               (when (async/>! return new-batch)
-                 (recur (async/timeout msecs) []))
+               (when (async/>! return (vals batch))
+                 (recur (async/timeout msecs) {}))
                (recur deadline new-batch))))
          (do (when (not-empty batch)
-               (async/>! return batch))
+               (async/>! return (vals batch)))
              (async/close! return))))
      return)))
-
-(defmacro on-chan-close
-  "Execute body when the channel is closed. This is immediate upon
-   channel closing and occurs on the same thread that closed chan."
-  [chan & body]
-  `(let [id#      (UUID/randomUUID)
-         channel# ~chan]
-     (add-watch
-       (.closed ^ManyToManyChannel channel#) id#
-       (^:once fn* [k# r# o# n#]
-         (when (and (false? o#) (true? n#))
-           (try ~@body (finally (remove-watch r# id#))))))
-     channel#))
 
 (defmacro defmulti*
   "Like clojure.core/defmulti, but actually updates the dispatch value when you reload it."

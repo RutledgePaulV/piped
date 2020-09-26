@@ -18,7 +18,7 @@
     {:queue-url            queue-url
      :consumer-parallelism 1000
      :client-opts          (support/localstack-client-opts)
-     :transform            #(update % :Body edn/read-string)}
+     :transform-fn         #(update % :Body edn/read-string)}
     (get Body :kind))
 
   (defmethod my-processor :alert [{{:keys [message]} :Body}]

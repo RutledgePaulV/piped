@@ -14,10 +14,10 @@
         received   (promise)
         consumer   (fn [message] (deliver received message))
         system     (start (processor
-                            {:consumer-fn consumer
-                             :queue-url   queue-url
-                             :client-opts (support/localstack-client-opts)
-                             :transform   transform}))
+                            {:consumer-fn  consumer
+                             :queue-url    queue-url
+                             :client-opts  (support/localstack-client-opts)
+                             :transform-fn transform}))
         data       {:value 1}]
     (try
       (support/send-message queue-url data)

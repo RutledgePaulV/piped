@@ -60,7 +60,7 @@ Most users should only need to provide two things: the queue-url and the maximum
    ; *optional* - defaults to identity
    ; a pure function to preprocess the message before it arrives at 
    ; your consumer-fn. intended for parsing the message body into data
-   :transform            identity
+   :transform-fn         identity
 
    ; *optional* - defaults to {}
    ; configuration passed to the aws-api client in case you need to customize 
@@ -101,7 +101,7 @@ Most users should only need to provide two things: the queue-url and the maximum
 (defmultiprocessor my-processor [{:keys [Body]}]
   {:queue-url            "http://localhost:4576/queue/piped-test-queue17184"
    :consumer-parallelism 50
-   :transform            #(update % :Body edn/read-string)}
+   :transform-fn         #(update % :Body edn/read-string)}
   (get Body :kind))
 
 ; define normal clojure defmethods to process message variants

@@ -8,9 +8,6 @@
 
 
 (defn spawn-producer
-  ([client queue-url output-chan]
-   (spawn-producer client queue-url output-chan (utils/dev-null)))
-
   ([client queue-url output-chan nack-chan]
    (spawn-producer client queue-url output-chan nack-chan {}))
 

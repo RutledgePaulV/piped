@@ -1,6 +1,7 @@
 (ns piped.support
   (:require [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds])
+            [cognitect.aws.credentials :as creds]
+            [clojure.core.async :as async])
   (:import (org.testcontainers.containers.wait.strategy Wait)
            (org.testcontainers.containers GenericContainer)
            (java.time Duration)
@@ -63,3 +64,6 @@
 
 (defn gen-queue-name []
   (name (gensym "piped-test-queue")))
+
+(defn dev-null []
+  (async/chan (async/dropping-buffer 0)))

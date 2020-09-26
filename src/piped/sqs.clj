@@ -5,7 +5,7 @@
             [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
-  (if (= 1 (bounded-count 2 result-chans))
+  (if (= 1 (count result-chans))
     (first result-chans)
     (async/go-loop [channels (set result-chans)
                     results {:Successful [] :Failed []}]
@@ -29,35 +29,23 @@
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
          (let [request {:op      :ChangeMessageVisibilityBatch
                         :request {:QueueUrl queue-url
-                                  :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
-                                                   {:Id                MessageId
-                                                    :ReceiptHandle     ReceiptHandle
-                                                    :VisibilityTimeout visibility-timeout})
-                                                 (utils/distinct-by :Id))}}]
+                                  :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
+                                              {:Id                MessageId
+                                               :ReceiptHandle     ReceiptHandle
+                                               :VisibilityTimeout visibility-timeout})}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
-
-(defn ack-one [client {:keys [ReceiptHandle] :as message}]
-  (let [queue-url (utils/message->queue-url message)
-        request   {:op      :DeleteMessage
-                   :request {:QueueUrl      queue-url
-                             :ReceiptHandle ReceiptHandle}}]
-    (api.async/invoke client request)))
 
 (defn ack-many [client messages]
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
          (let [request
                {:op      :DeleteMessageBatch
                 :request {:QueueUrl queue-url
-                          :Entries  (->> (for [{:keys [MessageId ReceiptHandle]} (rseq messages)]
-                                           {:Id            MessageId
-                                            :ReceiptHandle ReceiptHandle})
-                                         (utils/distinct-by :Id))}}]
+                          :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
+                                      {:Id            MessageId
+                                       :ReceiptHandle ReceiptHandle})}}]
            (api.async/invoke client request)))
        (combine-batch-results)))
-
-(defn nack-one [client message]
-  (change-visibility-one client message 0))
 
 (defn nack-many [client messages]
   (change-visibility-batch client messages 0))

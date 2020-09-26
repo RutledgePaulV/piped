@@ -34,27 +34,15 @@
           (let [old-timeout (utils/message->timeout msg)
                 new-timeout (* 2 old-timeout)
                 response    (do
-                              (log/infof "Extending visibility for inflight message %s from %d to %d seconds."
-                                         (get msg :MessageId) old-timeout
+                              (log/infof "Extending visibility for inflight message %s in queue %s from %d to %d seconds."
+                                         (utils/message->identifier msg)
+                                         (utils/message->queue-url msg)
+                                         old-timeout
                                          new-timeout)
                               (async/<! (sqs/change-visibility-one client msg new-timeout)))]
             (when (utils/anomaly? response)
               (log/error "Error extending visibility timeout of inflight message." (pr-str response)))
             (recur (-> msg (utils/with-deadline (* new-timeout 1000)) (utils/with-timeout new-timeout)) task)))))))
-
-(defn- ->processor
-  "Turns a function with unknown behavior into a predictable
-   function with well-defined return values and no exceptions."
-  [processor-fn]
-  (fn [msg]
-    (try
-      (let [result (processor-fn msg)]
-        (if (contains? #{:ack :nack} result)
-          result
-          :ack))
-      (catch Exception e
-        (log/error e "Exception processing sqs message.")
-        :nack))))
 
 
 (defn spawn-consumer-async
@@ -64,26 +52,23 @@
     :input-chan    - a channel of incoming sqs messages
     :ack-chan      - a channel that accepts messages that should be acked
     :nack-chan     - a channel that accepts messages that should be nacked
-    :processor     - a function of a message that either returns a result directly
+    :consumer-fn   - a function of a message that either returns a result directly
                      or may return a core.async channel that emits once (like a
                      promise chan) when finished processing the message. Must not
                      block.
   "
-  [client input-chan ack-chan nack-chan processor]
+  [client input-chan ack-chan nack-chan consumer-fn]
   (make-consumer client input-chan ack-chan nack-chan
-    (let [lifted (->processor identity)]
-      (fn [msg]
-        (async/map
-          lifted
-          [(async/go
-             (try
-               (let [result (processor msg)]
-                 (if (utils/channel? result)
-                   (async/<! result)
-                   result))
-               (catch Exception e
-                 (log/error e "Exception processing sqs message in async consumer.")
-                 :nack)))])))))
+    (fn [msg]
+      (async/go
+        (try
+          (loop [result (consumer-fn msg)]
+            (if (utils/channel? result)
+              (recur (async/<! result))
+              (if (contains? #{:ack :nack} result) result :ack)))
+          (catch Exception e
+            (log/error e "Exception processing sqs message in async consumer.")
+            :nack))))))
 
 
 (defn spawn-consumer-blocking
@@ -93,11 +78,19 @@
     :input-chan    - a channel of incoming sqs messages
     :ack-chan      - a channel that accepts messages that should be acked
     :nack-chan     - a channel that accepts messages that should be nacked
-    :processor     - a function of a message that may perform blocking side effects with the message
-
+    :consumer-fn   - a function of a message that may perform blocking io with
+                     the message.
   "
-  [client input-chan ack-chan nack-chan processor]
+  [client input-chan ack-chan nack-chan consumer-fn]
   (make-consumer client input-chan ack-chan nack-chan
-    (let [lifted (->processor processor)]
-      (fn [msg] (async/thread (lifted msg))))))
+    (fn [msg]
+      (async/thread
+        (try
+          (loop [result (consumer-fn msg)]
+            (if (utils/channel? result)
+              (recur (async/<!! result))
+              (if (contains? #{:ack :nack} result) result :ack)))
+          (catch Exception e
+            (log/error e "Exception processing sqs message in blocking consumer.")
+            :nack))))))
 
