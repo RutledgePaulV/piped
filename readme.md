@@ -105,6 +105,8 @@ Most users should only need to provide two things: the queue-url and the maximum
   (get Body :kind))
 
 ; define normal clojure defmethods to process message variants
+; there is already a :default clause defined to log and nack any
+; message for which there is no matching defmethod
 
 (defmethod my-processor :alert [message]
   (log/error (get-in message [:Body :message])))

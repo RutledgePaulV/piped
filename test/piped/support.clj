@@ -43,6 +43,16 @@
                       :MessageBody (pr-str value)}}]
     (:MessageId (aws/invoke @client op))))
 
+(defn receive-message-batch [queue-url]
+  (let [op {:op      :ReceiveMessage
+            :request {:QueueUrl              queue-url
+                      :MaxNumberOfMessages   10
+                      :VisibilityTimeout     5
+                      :WaitTimeSeconds       0
+                      :AttributeNames        ["All"]
+                      :MessageAttributeNames ["All"]}}]
+    (:Messages (aws/invoke @client op) [])))
+
 (defn send-message-batch [queue-url messages]
   (let [op {:op      :SendMessageBatch
             :request {:QueueUrl queue-url
