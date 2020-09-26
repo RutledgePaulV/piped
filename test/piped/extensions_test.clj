@@ -23,7 +23,7 @@
                       :consumer-parallelism 2})]
     (support/send-message-batch queue-url messages)
     (piped/start processor)
-    (loop [waiting 31]
+    (loop [waiting 25]
       (when-not (.await finished waiting TimeUnit/SECONDS)
         (is (empty? (support/receive-message-batch queue-url)))
         (recur 1)))
