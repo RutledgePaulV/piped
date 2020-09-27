@@ -5,11 +5,11 @@
 
 (deftest deadline-batching-test
   (let [received (atom [])
-        msg1     {:data 1 :deadline (async/timeout 3500)}
-        msg2     {:data 2 :deadline (async/timeout 4000)}
-        msg3     {:data 3 :deadline (async/timeout 5000)}
+        msg1     (with-meta {:data 1} {:deadline (async/timeout 3500)})
+        msg2     (with-meta {:data 2} {:deadline (async/timeout 4000)})
+        msg3     (with-meta {:data 3} {:deadline (async/timeout 5000)})
         chan     (async/chan)
-        return   (deadline-batching chan 5 :deadline)]
+        return   (deadline-batching chan 5)]
 
     (async/go-loop []
       (when-some [batch (async/<! return)]

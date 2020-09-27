@@ -11,7 +11,7 @@
 (s/def :piped/message map?)
 (s/def :piped/action #{:ack :nack})
 (s/def :piped/consumer-fn ifn?)
-(s/def :piped/transformer ifn?)
+(s/def :piped/transform-fn ifn?)
 (s/def :piped/system any?)
 
 (s/def :piped/options-map
@@ -23,7 +23,8 @@
              :piped/consumer-parallelism
              :piped/acker-parallelism
              :piped/nacker-parallelism
-             :piped/blocking-consumers]))
+             :piped/blocking-consumers
+             :piped/transform-fn]))
 
 (defn assert-options [config]
   (if-not (s/valid? :piped/options-map config)
