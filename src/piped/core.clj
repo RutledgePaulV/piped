@@ -154,20 +154,20 @@
                               ackers
                               nackers
                               client]} (force (deref state))]
-                  (log/debugf "Signaling producers and consumers to exit for %s." queue-url)
+                  (log/debugf "Signaling producers and consumers to exit for %s processor." queue-url)
                   (async/close! pipe)
                   (run! async/<!! producers)
-                  (log/debugf "Producers have exited for %s." queue-url)
+                  (log/debugf "Producers have exited for %s processor." queue-url)
                   (run! async/<!! consumers)
-                  (log/debugf "Consumers have exited for %s." queue-url)
-                  (log/debugf "Signaling ackers to exit for %s." queue-url)
+                  (log/debugf "Consumers have exited for %s processor." queue-url)
+                  (log/debugf "Signaling ackers to exit for %s processor." queue-url)
                   (async/close! acker-chan)
                   (run! async/<!! ackers)
-                  (log/debugf "Ackers have exited for %s." queue-url)
-                  (log/debugf "Signaling nackers to exit for %s." queue-url)
+                  (log/debugf "Ackers have exited for %s processor." queue-url)
+                  (log/debugf "Signaling nackers to exit for %s processor." queue-url)
                   (async/close! nacker-chan)
                   (run! async/<!! nackers)
-                  (log/debugf "Nackers have exited for %s." queue-url)
+                  (log/debugf "Nackers have exited for %s processor." queue-url)
                   (aws/stop client)
                   (log/debugf "Processor shutdown for %s finished." queue-url)))))
 
