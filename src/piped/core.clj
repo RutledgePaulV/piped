@@ -9,7 +9,8 @@
             [cognitect.aws.http :as http]
             [cognitect.http-client :as impl]
             [piped.specs :as specs]
-            [aws-api-credential-providers.core :as cp]))
+            [aws-api-credential-providers.core :as cp]
+            [clojure.tools.logging :as log]))
 
 (defprotocol PipedProcessor
   :extend-via-metadata true
@@ -144,6 +145,7 @@
             ^Runnable
             (fn []
               (when (realized? (deref state))
+                (log/debugf "Processor shutdown for %s initiated." queue-url)
                 (let [{:keys [pipe
                               acker-chan
                               nacker-chan
@@ -152,22 +154,22 @@
                               ackers
                               nackers
                               client]} (force (deref state))]
-                  ; signal producers and consumers
+                  (log/debugf "Signaling producers and consumers to exit for %s." queue-url)
                   (async/close! pipe)
-                  ; wait for producers to exit
                   (run! async/<!! producers)
-                  ; wait for consumers to exit
+                  (log/debugf "Producers have exited for %s." queue-url)
                   (run! async/<!! consumers)
-                  ; signal ackers
+                  (log/debugf "Consumers have exited for %s." queue-url)
+                  (log/debugf "Signaling ackers to exit for %s." queue-url)
                   (async/close! acker-chan)
-                  ; wait for ackers to exit
                   (run! async/<!! ackers)
-                  ; signal nackers
+                  (log/debugf "Ackers have exited for %s." queue-url)
+                  (log/debugf "Signaling nackers to exit for %s." queue-url)
                   (async/close! nacker-chan)
-                  ; wait for nackers to exit
                   (run! async/<!! nackers)
-                  ; close any http resources
-                  (aws/stop client)))))
+                  (log/debugf "Nackers have exited for %s." queue-url)
+                  (aws/stop client)
+                  (log/debugf "Processor shutdown for %s finished." queue-url)))))
 
           system
           (reify PipedProcessor
