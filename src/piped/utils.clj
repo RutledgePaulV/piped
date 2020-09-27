@@ -4,11 +4,6 @@
   (:import [clojure.core.async.impl.channels ManyToManyChannel]
            [java.util UUID]))
 
-(def minimum-messages-received 1)
-(def maximum-messages-received 10)
-(def maximum-wait-time-seconds 20)
-(def deadline-safety-buffer 2000)
-
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
 
@@ -56,13 +51,14 @@
 
 (defn backoff-seq
   "Returns an infinite seq of exponential back-off timeouts with random jitter."
-  [max]
-  (->>
-    (lazy-cat
-      (->> (cons 0 (iterate (partial * 2) 1000))
-           (take-while #(< % max)))
-      (repeat max))
-    (map (fn [x] (+ x (rand-int 1000))))))
+  ([] (backoff-seq 60000))
+  ([max]
+   (->>
+     (lazy-cat
+       (->> (cons 0 (iterate (partial * 2) 1000))
+            (take-while #(< % max)))
+       (repeat max))
+     (map (fn [x] (+ x (rand-int 1000)))))))
 
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever

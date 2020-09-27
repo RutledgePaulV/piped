@@ -6,14 +6,19 @@
             [clojure.tools.logging :as log]
             [clojure.core.async.impl.protocols :as impl]))
 
+(def min-receive 1)
+(def max-receive 10)
+(def max-wait 20)
+(def buffer-millis 2000)
+(def initial-timeout 30)
 
 (defn spawn-producer
   ([client queue-url output-chan nack-chan]
    (spawn-producer client queue-url output-chan nack-chan {}))
 
   ([client queue-url output-chan nack-chan
-    {:keys [MaxNumberOfMessages VisibilityTimeout MaxArtificialDelay]
-     :or   {MaxNumberOfMessages 10 VisibilityTimeout 30 MaxArtificialDelay 60000}}]
+    {:keys [MaxNumberOfMessages VisibilityTimeout]
+     :or   {MaxNumberOfMessages max-receive VisibilityTimeout initial-timeout}}]
 
    (async/go-loop [max-number-of-messages MaxNumberOfMessages backoff-seq []]
 
@@ -24,7 +29,7 @@
             :request {:QueueUrl              queue-url
                       :MaxNumberOfMessages   max-number-of-messages
                       :VisibilityTimeout     VisibilityTimeout
-                      :WaitTimeSeconds       utils/maximum-wait-time-seconds
+                      :WaitTimeSeconds       max-wait
                       :AttributeNames        ["All"]
                       :MessageAttributeNames ["All"]}}
 
@@ -36,7 +41,7 @@
            (get response :Messages [])
 
            deadline
-           (async/timeout (- (* VisibilityTimeout 1000) utils/deadline-safety-buffer))
+           (async/timeout (- (* VisibilityTimeout 1000) buffer-millis))
 
            metadata
            {:deadline deadline :queue-url queue-url :timeout VisibilityTimeout}
@@ -68,8 +73,8 @@
 
        (case action
          :error
-         (let [[backoff :as backoff-seq] (or (seq backoff-seq) (utils/backoff-seq MaxArtificialDelay))]
-           (log/errorf "Error returned when polling sqs queue %s. Waiting for %d milliseconds. %s" queue-url backoff (pr-str response))
+         (let [[backoff :as backoff-seq] (or (seq backoff-seq) (utils/backoff-seq))]
+           (log/errorf "Error returned when polling sqs queue %s. Backing off %d milliseconds. %s" queue-url backoff (pr-str response))
            (async/<! (async/timeout backoff))
            (recur max-number-of-messages (rest backoff-seq)))
 
@@ -80,11 +85,8 @@
          (let [wanted    max-number-of-messages
                received  (count original-messages)
                accepted  (- received (count remainder))
-               new-count (utils/clamp
-                           utils/minimum-messages-received
-                           utils/maximum-messages-received
-                           (utils/average- accepted wanted))]
-           (log/warnf "Consumers were unable to accept %d messages from %s before the messages expired." (count remainder) queue-url)
+               new-count (utils/clamp min-receive max-receive (utils/average- accepted wanted))]
+           (log/warnf "Consumers of %s unable to accept %d messages before they expired." queue-url (count remainder))
            ; probably just let aws handle it and skip the network traffic since already very near expiry
            #_(async/onto-chan! nack-chan remainder false)
            (recur new-count []))
@@ -96,9 +98,6 @@
 
          :accepted
          (let [received  (count original-messages)
-               new-count (utils/clamp
-                           utils/minimum-messages-received
-                           utils/maximum-messages-received
-                           (utils/average+ received utils/maximum-messages-received))]
+               new-count (utils/clamp min-receive max-receive (utils/average+ received max-receive))]
            (log/debugf "All messages polled from %s were accepted by consumers." queue-url)
            (recur new-count [])))))))

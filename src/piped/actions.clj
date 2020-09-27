@@ -5,7 +5,7 @@
             [piped.sqs :as sqs]))
 
 (defn spawn-acker
-  "Acks messages in batches."
+  "Acks batches of messages."
   [client input-chan]
   (async/go-loop []
     (when-some [batch (async/<! input-chan)]
@@ -15,7 +15,7 @@
       (recur))))
 
 (defn spawn-nacker
-  "Nacks messages in batches."
+  "Nacks batches of messages."
   [client input-chan]
   (async/go-loop []
     (when-some [batch (async/<! input-chan)]
