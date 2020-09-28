@@ -1,10 +1,13 @@
 [![Build Status](https://travis-ci.com/rutledgepaulv/piped.svg?branch=master)](https://travis-ci.com/rutledgepaulv/piped)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/piped.svg)](https://clojars.org/org.clojars.rutledgepaulv/piped)
 
+<img src="./docs/ready-hans.jpg" title="harmonic labyrinth" width="250" height="250" align="left" padding="5px"/>
+<small>
 A Clojure library that enables applications to consume Amazon's Simple Queue Service (SQS) with minimal 
 ceremony while achieving superior resilience and performance properties. Uses core.async behind the scenes 
 to construct an efficient message processing system fed by SQS and provides easy high level Clojure APIs on top.
-
+</small>
+<br clear="all" /><br />
 
 ---
 
