@@ -32,7 +32,8 @@ the max batch size is met or one of the messages in the batch is near expiry and
 than waiting for the batch to finish filling up.
 
 #### Minimal Configuration
-Most users should only need to provide two things: the queue-url and the maximum concurrency for message processing.
+Most users should only need to provide two things: the `queue-url` and the `consumer-parallelism` for message processing. Piped
+automatically chooses the number of sqs polling processes needed to saturate your consumers.
 
 ---
 
@@ -126,10 +127,10 @@ Most users should only need to provide two things: the queue-url and the maximum
 
 ### Performance
 
-I will eventually produce some real benchmarks against AWS and perhaps contrast with squeedo but some 
-early testing was showing 600 messages/second of throughput against localstack before localstack became
-the bottleneck.
-
+Early testing shows around 6500 messages/second of throughput (received, printed, and acked) 
+when using a `consumer-parallelism` of 1000. This exceeds the AWS throughput cap of 3000 for 
+fifo queues with just one process. Obviously the throughput will decrease once you're doing 
+more with each message than printing it. Benchmarking suite forthcoming.
 
 ---
 
