@@ -20,7 +20,7 @@ non-blocking io via an asynchronous jetty client.
 
 #### Supports both Blocking IO and CPU Bound processors
 Uses core.async for the internal machinery, but as a consumer you should be free to perform blocking io if you need to
-and you are. Blocking consumers are the default mode but you can opt into non-blocking consumers if that's your style.
+and you are. Blocking consumers are the default but you can opt into non-blocking consumers.
 
 #### Lease Extensions
 If your consumer is still working on a message as it nears its visibility timeout, piped will extend the visibility timeout
@@ -69,13 +69,13 @@ automatically chooses the number of sqs polling processes needed to saturate you
 
    ; *optional* - defaults to {}
    ; configuration passed to the aws-api client in case you need to customize 
-   ; things like the credentials provider or endpoints for testing against
+   ; things like the credentials provider
    :client-opts          {}
 
    ; *optional* - defaults to true
    ; whether to create dedicated threads for processing each message
    ; or if the processing should share the core.async dispatch thread
-   ; pool (only set this to false if you're doing non-blocking io)
+   ; pool (only set this to false if you're doing non-blocking)
    :blocking-consumers   true})
 
 ; registers a processor with the above config
@@ -154,13 +154,12 @@ consumption rate.
 #### Consumers
 
 These read SQS messages from the pipe and hand them to your message processing function. Consumers 
-supervise the message processing in order to extend visibility timeouts, nack failed messages, 
-and ack messages that were processed successfully. 
+supervise the message processing in order to extend visibility timeout and eventually route messages 
+to be acked or nacked.
 
-Async/compute consumers run your processing function on one of the go-block dispatch threads and 
+Non-blocking consumers run your processing function on one of the go-block dispatch threads and 
 should only be used for cpu-bound tasks. Blocking consumers run your processing function on a 
-dedicated thread and should be used for blocking-io. Blocking consumers are the default when 
-you create a system.
+dedicated thread and may be used for blocking io. Blocking consumers are the default mode.
 
 #### Ackers
 
@@ -176,7 +175,7 @@ or the batch has been accumulating for longer than 5 seconds.
 
 This is the code that you write. It receives a message and can do whatever it wants with it. 
 If `:ack` or `:nack` are returned, the message will be acked or nacked. If an exception is thrown 
-the message will be nacked. Any other return values will be acked. When you have multiple kinds of
+the message will be nacked. Any other return values will be acked. If you have multiple kinds of
 messages in your queue a multimethod is a good choice.
 
 #### Processor
