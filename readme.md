@@ -131,11 +131,11 @@ automatically chooses the number of sqs polling processes needed to saturate you
 
 ### Performance
 
-Early testing shows around 6500 messages/second of throughput (received, printed, and acked) 
-when using a `consumer-parallelism` of 1000. This exceeds the AWS throughput cap of 3000 for 
-fifo queues with just one process. Obviously the throughput will decrease once you're doing 
-more with each message than printing it. Benchmarking suite forthcoming.
+Early testing shows around 2200 messages per second of throughput (received, printed, and acked) 
+when using a `consumer-parallelism` of 1000. Obviously the throughput will decrease once you're 
+doing more with each message than printing it. Benchmarking suite forthcoming.
 
+![Throughput](./docs/throughput.png)
 ---
 
 
