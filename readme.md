@@ -5,8 +5,8 @@
 <small>
 <br/><br/><br/><br/>
 A Clojure library that enables applications to consume messages from Amazon's Simple Queue Service (SQS) 
-with minimal ceremony while achieving superior resilience and performance properties. Uses core.async to 
-construct an efficient processing machine behind the scenes and provides an easy high level API.
+with minimal ceremony while achieving superior resilience and performance properties. Leverages core.async 
+to construct an efficient processing machine behind the scenes and provides an easy high level API.
 </small>
 <br clear="all" /><br />
 
