@@ -3,9 +3,10 @@
 
 <img src="./docs/ready-hans.jpg" title="harmonic labyrinth" width="300" height="300" align="left" padding="5px"/>
 <small>
-A Clojure library that enables applications to consume Amazon's Simple Queue Service (SQS) with minimal 
-ceremony while achieving superior resilience and performance properties. Uses core.async behind the scenes 
-to construct an efficient message processing system fed by SQS and provides easy high level Clojure APIs on top.
+<br/><br/><br/><br/>
+A Clojure library that enables applications to consume messages from Amazon's Simple Queue Service (SQS) 
+with minimal ceremony while achieving superior resilience and performance properties. Uses core.async behind
+the scenes to construct an efficient processing machine fed by SQS and provides an easy high level API.
 </small>
 <br clear="all" /><br />
 
