@@ -5,8 +5,8 @@
 <small>
 <br/><br/><br/><br/>
 A Clojure library that enables applications to consume messages from Amazon's Simple Queue Service (SQS) 
-with minimal ceremony while achieving superior resilience and performance properties. Uses core.async behind
-the scenes to construct an efficient processing machine fed by SQS and provides an easy high level API.
+with minimal ceremony while achieving superior resilience and performance properties. Leverages core.async 
+to construct an efficient processing machine behind the scenes and provides an easy high level API.
 </small>
 <br clear="all" /><br />
 
@@ -16,7 +16,7 @@ the scenes to construct an efficient processing machine fed by SQS and provides 
 
 #### Lightweight Async AWS
 Uses [cognitect's AWS client](https://github.com/cognitect-labs/aws-api) for a minimal library footprint and true 
-non-blocking io using core.async and an asynchronous jetty client.
+non-blocking io via an asynchronous jetty client.
 
 #### Supports both Blocking IO and CPU Bound processors
 Uses core.async for the internal machinery, but as a consumer you should be free to perform blocking io if you need to
