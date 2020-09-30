@@ -1,6 +1,6 @@
-```javascript 
+```clojure 
 
-// Process is humming along
+; process is humming along
 
 "Beginning new long poll of sqs queue https://sqs.us-east-1.amazonaws.com/933109431395/piped."
 "All messages polled from https://sqs.us-east-1.amazonaws.com/933109431395/piped were accepted by consumers."
@@ -18,14 +18,12 @@
 "All messages polled from https://sqs.us-east-1.amazonaws.com/933109431395/piped were accepted by consumers."
 "Beginning new long poll of sqs queue https://sqs.us-east-1.amazonaws.com/933109431395/piped."
 
-//
-// Process was signaled with SIGTERM
-//
+; process was signaled with SIGTERM
 
 "Processor shutdown for https://sqs.us-east-1.amazonaws.com/933109431395/piped initiated."
 "Signaling producers and consumers to exit for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 
-// finishing processing in-flight messages
+; finishing processing in-flight messages
 
 "Processed message 15fdb8a9-8f6f-4ca2-a9dd-d834c6443e48"
 "Processed message d65a29ee-0333-4ebc-a5f3-a14f84c6e363"
@@ -38,27 +36,25 @@
 "Processed message e8569316-becf-487d-a5ef-2cc4388b0de1"
 "Processed message cb2ea600-0004-40b5-9f78-9f8b83e99f42"
 
-// has now completely stopped receiving messages from SQS 
+; has now completely stopped receiving messages from SQS 
 "Producer stopping because channel for queue https://sqs.us-east-1.amazonaws.com/933109431395/piped has been closed."
 "Producers have exited for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 
-// last consumer finishes last in-flight message
+; last consumer finishes last in-flight message
 "Processed message ad6d4d3b-40b7-4436-a90d-e3f927d6926c"
 "Consumers have exited for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 
-// ackers are closed now that they have their final messages to ack
+; ackers are closed now that they have their final messages to ack
 "Signaling ackers to exit for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 "Ackers have exited for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 
-// nackers are closed now that they have their final messages to nack
+; nackers are closed now that they have their final messages to nack
 "Signaling nackers to exit for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 "Nackers have exited for https://sqs.us-east-1.amazonaws.com/933109431395/piped processor."
 
-// processor has finished shutting down gracefully
+; processor has finished shutting down gracefully
 "Processor shutdown for https://sqs.us-east-1.amazonaws.com/933109431395/piped finished."
 
-//
-// Process exited
-//
+; process exited
 
 ```
