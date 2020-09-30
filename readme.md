@@ -22,7 +22,7 @@ non-blocking io via an asynchronous jetty client.
 Uses core.async for the internal machinery, but as a consumer you should be free to perform blocking io if you need to
 and you are. Blocking consumers are the default but you can opt into non-blocking consumers.
 
-#### Lease Extensions
+#### Automatic Lease Extensions
 If your consumer is still working on a message as it nears its visibility timeout, piped will extend the visibility timeout
 for you instead of risking that another worker will start processing the same message. 
 
@@ -34,6 +34,10 @@ never grabbing items off the queue that you aren't ready to process in a timely 
 Messages are read and acked in batches which decreases your costs and improves throughput. Ack batches are accumulated until
 the max batch size is met or one of the messages in the batch is near expiry and therefore needs to be acked promptly rather
 than waiting for the batch to finish filling up.
+
+#### Graceful Shutdown
+New messages stop being requested, in-flight messages are given a chance to finish, and final acks and nacks are sent. You 
+must allow time after the SIGTERM for this process to happen before issuing a SIGKILL. You can see an actual [shutdown sequence here](./docs/shutdown-sequence.md).
 
 #### Minimal Configuration
 Most users should only need to provide two things: the `queue-url` and the `consumer-parallelism` for message processing. Piped
