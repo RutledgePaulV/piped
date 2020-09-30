@@ -131,9 +131,15 @@ automatically chooses the number of sqs polling processes needed to saturate you
 
 ### Performance
 
-Early testing shows around 2200 messages per second of throughput (received, printed, and acked) 
-when using a `consumer-parallelism` of 1000. Obviously the throughput will decrease once you're 
-doing more with each message than printing it. Benchmarking suite forthcoming.
+Casual testing easily reaches 4200 messages per second of throughput (received, printed, and acked) 
+when using a consumer parallelism above 500. This exceeds the 3000 message/second aws limit for fifo 
+queues and is quite high for a single process. Real-world throughput will depend heavily on what you 
+do with each message but it's unlikely Piped will become your bottleneck. 
+
+
+The results below were measured processing 100,000 messages on a mid-range 2019 Macbook Pro 
+over 70 down / 15 up wi-fi and traversing the public internet from Chicago to Virginia (us-east-1).
+
 
 ![Throughput](./docs/throughput.png)
 ---
