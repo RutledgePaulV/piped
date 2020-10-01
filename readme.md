@@ -136,8 +136,7 @@ automatically chooses the number of sqs polling processes needed to saturate you
 ### Performance
 
 Casual testing easily reaches 4000-5500 messages per second of throughput (received, printed, and acked) 
-when using a consumer parallelism above 500. This exceeds the 3000 message/second aws limit for fifo 
-queues and is quite high for a single process. Real-world throughput will depend heavily on what you 
+when using a consumer parallelism above 500. Real-world throughput will depend heavily on what you 
 do with each message but it's unlikely Piped will become your bottleneck. 
 
 
