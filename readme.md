@@ -197,10 +197,9 @@ A set of the above abstractions that can be started and stopped.
 
 [Squeedo](https://github.com/TheClimateCorporation/squeedo)
 
-Frankly I made this library because of perceived deficiencies in Squeedo and as such can't recommend it.
-Squeedo inappropriately performs blocking-io from go blocks when receiving and acking messages which can
-lead to poor performance. It is my opinion that Squeedo also doesn't provide enough leverage over the raw AWS SDK. 
-YMMV.
+I made this library because of perceived deficiencies in Squeedo. Squeedo performs blocking io from go blocks 
+when receiving and acking messages which can lead to poor performance. It is my opinion that Squeedo also 
+doesn't provide enough leverage over the raw AWS SDK. YMMV.
 
 - [Performing a blocking ReceiveMessage call on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L34-L36)
 - [Performing blocking acks/nacks on a go thread](https://github.com/TheClimateCorporation/squeedo/blob/master/src/com/climate/squeedo/sqs_consumer.clj#L87-L91)
