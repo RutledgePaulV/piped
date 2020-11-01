@@ -58,9 +58,11 @@ automatically chooses the number of sqs polling processes needed to saturate you
 
    ; *required* 
    ; the function that gets called to process each message
-   ; it may throw or return :nack in order to redrive the message (or DLQ depending on redrive policy)
-   ; otherwise you may return :ack (or anything else) to result in an ack of the message
-   ; you may also return a channel that eventually delivers either :ack or :nack (intended for non-blocking mode)
+   ; it may throw or return :nack in order to redrive the message 
+   ; (or DLQ depending on redrive policy). otherwise you may return 
+   ; :ack (or anything else) to result in an ack of the message
+   ; you may also return a channel that eventually delivers either 
+   ; :ack or :nack (intended for non-blocking mode)
    :consumer-fn          (fn [msg] (println msg))
 
    ; *optional* - defaults to 10
