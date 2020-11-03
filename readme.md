@@ -140,9 +140,9 @@ automatically chooses the number of sqs polling processes needed to saturate you
 
 ### Performance
 
-Casual testing easily reaches 4000-5500 messages per second of throughput (received, printed, and acked) 
-when using a consumer parallelism above 500. Real-world throughput will depend heavily on what you 
-do with each message but it's unlikely Piped will become your bottleneck. 
+Casual testing easily reaches between 4000 (local) and 5500 (ec2) messages per second of throughput 
+(received, printed, and acked) when using a consumer parallelism above 500. Real-world throughput 
+will depend heavily on what you do with each message but it's unlikely Piped will become your bottleneck. 
 
 
 The results below were measured processing 100,000 messages on a mid-range 2019 Macbook Pro 
