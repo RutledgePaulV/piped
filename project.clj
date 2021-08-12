@@ -1,4 +1,4 @@
-(defproject org.clojars.rutledgepaulv/piped "0.1.7"
+(defproject org.clojars.rutledgepaulv/piped "0.1.8-SNAPSHOT"
 
   :description
   "A library for processing AWS SQS messages from a Clojure application."
