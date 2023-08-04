@@ -193,7 +193,3 @@
       (swap! processors assoc queue-url system)
 
       system)))
-
-
-
-

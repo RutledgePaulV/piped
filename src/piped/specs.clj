@@ -12,19 +12,21 @@
 (s/def :piped/action #{:ack :nack})
 (s/def :piped/consumer-fn ifn?)
 (s/def :piped/transform-fn ifn?)
+(s/def :piped/backoff-fn ifn?)
 (s/def :piped/system any?)
 
 (s/def :piped/options-map
   (s/keys
-    :req-un [:piped/queue-url
-             :piped/consumer-fn]
-    :opt-un [:piped/client-opts
-             :piped/producer-parallelism
-             :piped/consumer-parallelism
-             :piped/acker-parallelism
-             :piped/nacker-parallelism
-             :piped/blocking-consumers
-             :piped/transform-fn]))
+   :req-un [:piped/queue-url
+            :piped/consumer-fn]
+   :opt-un [:piped/client-opts
+            :piped/producer-parallelism
+            :piped/consumer-parallelism
+            :piped/acker-parallelism
+            :piped/nacker-parallelism
+            :piped/blocking-consumers
+            :piped/transform-fn
+            :piped/backoff-fn]))
 
 (defn assert-options [config]
   (if-not (s/valid? :piped/options-map config)

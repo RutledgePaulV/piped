@@ -16,11 +16,13 @@
 
 (defn spawn-nacker
   "Nacks batches of messages."
-  [client input-chan backoff-fn]
-  (async/go-loop []
-    (when-some [batch (async/<! input-chan)]
-      (let [response (async/<! (sqs/nack-many client batch backoff-fn))]
-        (when (utils/anomaly? response)
-          (log/error "Error when trying to nack batch of messages." (pr-str response))))
-      (recur))))
+  ([client input-chan]
+   (spawn-nacker client input-chan (constantly 0)))
+  ([client input-chan backoff-fn]
+   (async/go-loop []
+     (when-some [batch (async/<! input-chan)]
+       (let [response (async/<! (sqs/nack-many client batch backoff-fn))]
+         (when (utils/anomaly? response)
+           (log/error "Error when trying to nack batch of messages." (pr-str response))))
+       (recur)))))
 

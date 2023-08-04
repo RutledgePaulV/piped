@@ -47,5 +47,8 @@
            (api.async/invoke client request)))
        (combine-batch-results)))
 
-(defn nack-many [client messages backoff-fn]
-  (change-visibility-batch client messages backoff-fn))
+(defn nack-many
+  ([client messages]
+   (nack-many client messages (constantly 0)))
+  ([client messages backoff-fn]
+   (change-visibility-batch client messages backoff-fn)))
