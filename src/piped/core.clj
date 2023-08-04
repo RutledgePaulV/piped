@@ -73,6 +73,7 @@
            queue-url
            consumer-fn
            transform-fn
+           backoff-fn
            producer-parallelism
            consumer-parallelism
            acker-parallelism
@@ -90,10 +91,10 @@
                   nacker-parallelism   (or nacker-parallelism producer-parallelism)
                   max-http-ops         (+ producer-parallelism acker-parallelism nacker-parallelism)
                   http-client          (delay (http-client
-                                                {:pending-ops-limit               max-http-ops
-                                                 :max-connections-per-destination max-http-ops}))
+                                               {:pending-ops-limit               max-http-ops
+                                                :max-connections-per-destination max-http-ops}))
                   credentials-provider (delay (cp/default-credentials-provider
-                                                (or (:http-client client-opts) (force http-client))))
+                                               (or (:http-client client-opts) (force http-client))))
                   client               (cond-> (or client-opts {})
                                          (not (contains? client-opts :http-client))
                                          (assoc :http-client (force http-client))
@@ -108,7 +109,8 @@
                   pipe                 (async/chan)
                   acker-batched        (utils/deadline-batching acker-chan 10)
                   nacker-batched       (utils/interval-batching nacker-chan 5000 10)
-                  composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)]
+                  composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)
+                  backoff-fn           (if backoff-fn backoff-fn (constantly 0))]
 
               (letfn [(spawn-producer []
                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
@@ -123,7 +125,7 @@
                         (actions/spawn-acker client acker-batched))
 
                       (spawn-nacker []
-                        (actions/spawn-nacker client nacker-batched))]
+                        (actions/spawn-nacker client nacker-batched backoff-fn))]
 
                 {:client         client
                  :acker-chan     acker-chan
@@ -136,40 +138,39 @@
                  :ackers         (doall (repeatedly acker-parallelism spawn-acker))
                  :nackers        (doall (repeatedly nacker-parallelism spawn-nacker))})))]
 
-
     (let [state
           (atom (delay (launch)))
 
           shutdown-thread
           (Thread.
-            ^Runnable
-            (fn []
-              (when (realized? (deref state))
-                (log/debugf "Processor shutdown for %s initiated." queue-url)
-                (let [{:keys [pipe
-                              acker-chan
-                              nacker-chan
-                              producers
-                              consumers
-                              ackers
-                              nackers
-                              client]} (force (deref state))]
-                  (log/debugf "Signaling producers and consumers to exit for %s processor." queue-url)
-                  (async/close! pipe)
-                  (run! async/<!! producers)
-                  (log/debugf "Producers have exited for %s processor." queue-url)
-                  (run! async/<!! consumers)
-                  (log/debugf "Consumers have exited for %s processor." queue-url)
-                  (log/debugf "Signaling ackers to exit for %s processor." queue-url)
-                  (async/close! acker-chan)
-                  (run! async/<!! ackers)
-                  (log/debugf "Ackers have exited for %s processor." queue-url)
-                  (log/debugf "Signaling nackers to exit for %s processor." queue-url)
-                  (async/close! nacker-chan)
-                  (run! async/<!! nackers)
-                  (log/debugf "Nackers have exited for %s processor." queue-url)
-                  (aws/stop client)
-                  (log/debugf "Processor shutdown for %s finished." queue-url)))))
+           ^Runnable
+           (fn []
+             (when (realized? (deref state))
+               (log/debugf "Processor shutdown for %s initiated." queue-url)
+               (let [{:keys [pipe
+                             acker-chan
+                             nacker-chan
+                             producers
+                             consumers
+                             ackers
+                             nackers
+                             client]} (force (deref state))]
+                 (log/debugf "Signaling producers and consumers to exit for %s processor." queue-url)
+                 (async/close! pipe)
+                 (run! async/<!! producers)
+                 (log/debugf "Producers have exited for %s processor." queue-url)
+                 (run! async/<!! consumers)
+                 (log/debugf "Consumers have exited for %s processor." queue-url)
+                 (log/debugf "Signaling ackers to exit for %s processor." queue-url)
+                 (async/close! acker-chan)
+                 (run! async/<!! ackers)
+                 (log/debugf "Ackers have exited for %s processor." queue-url)
+                 (log/debugf "Signaling nackers to exit for %s processor." queue-url)
+                 (async/close! nacker-chan)
+                 (run! async/<!! nackers)
+                 (log/debugf "Nackers have exited for %s processor." queue-url)
+                 (aws/stop client)
+                 (log/debugf "Processor shutdown for %s finished." queue-url)))))
 
           system
           (reify PipedProcessor
