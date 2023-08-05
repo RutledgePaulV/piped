@@ -124,7 +124,7 @@
                         (actions/spawn-acker client acker-batched))
 
                       (spawn-nacker []
-                        (actions/spawn-nacker client nacker-batched nacker-opts))]
+                        (actions/spawn-nacker client nacker-batched (or nacker-opts {})))]
 
                 {:client         client
                  :acker-chan     acker-chan
