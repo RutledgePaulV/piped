@@ -76,16 +76,16 @@ automatically chooses the number of sqs polling processes needed to saturate you
    ; your consumer-fn. intended for parsing the message body into data
    :transform-fn         identity
 
-   ; *optional* - defaults to (constantly 0)
-   ; a pure function to determine based off of a message how long
-   ; (in seconds) it should remain invisible to queue consumers after
-   ; being nacked.
-   :backoff-fn
-
    ; *optional* - defaults to {}
    ; configuration passed to the aws-api client in case you need to customize 
    ; things like the credentials provider
    :client-opts          {}
+
+   ; *optional* - defaults to {}
+   ; a map of possible configuration vars passed to nackers in case you need
+   ; customize things like how the VisibilityTimeout of nacked messages is
+   ; calculated
+   :nacker-opts          {:visibility-timeout-fn (fn [msg] (constantly 5))}
 
    ; *optional* - defaults to true
    ; whether to create dedicated threads for processing each message
