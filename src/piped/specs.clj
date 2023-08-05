@@ -12,7 +12,7 @@
 (s/def :piped/action #{:ack :nack})
 (s/def :piped/consumer-fn ifn?)
 (s/def :piped/transform-fn ifn?)
-(s/def :piped/backoff-fn ifn?)
+(s/def :piped/nacker-opts (s/map-of #{:visibility-timeout-fn} ifn?))
 (s/def :piped/system any?)
 
 (s/def :piped/options-map
@@ -26,7 +26,7 @@
             :piped/nacker-parallelism
             :piped/blocking-consumers
             :piped/transform-fn
-            :piped/backoff-fn]))
+            :piped/nacker-opts]))
 
 (defn assert-options [config]
   (if-not (s/valid? :piped/options-map config)

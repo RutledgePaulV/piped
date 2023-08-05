@@ -25,16 +25,20 @@
                            :VisibilityTimeout visibility-timeout}}]
     (api.async/invoke client request)))
 
-(defn change-visibility-batch [client messages backoff-fn]
-  (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
-         (let [request {:op      :ChangeMessageVisibilityBatch
-                        :request {:QueueUrl queue-url
-                                  :Entries  (for [{:keys [MessageId ReceiptHandle] :as message} messages]
-                                              {:Id                MessageId
-                                               :ReceiptHandle     ReceiptHandle
-                                               :VisibilityTimeout (backoff-fn message)})}}]
-           (api.async/invoke client request)))
-       (combine-batch-results)))
+(defn change-visibility-batch
+  ([client messages]
+   (change-visibility-batch client messages {}))
+  ([client messages {:keys [visibility-timeout-fn]
+                     :or   {visibility-timeout-fn (constantly 0)}}]
+   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
+          (let [request {:op      :ChangeMessageVisibilityBatch
+                         :request {:QueueUrl queue-url
+                                   :Entries  (for [{:keys [MessageId ReceiptHandle] :as message} messages]
+                                               {:Id                MessageId
+                                                :ReceiptHandle     ReceiptHandle
+                                                :VisibilityTimeout (visibility-timeout-fn message)})}}]
+            (api.async/invoke client request)))
+        (combine-batch-results))))
 
 (defn ack-many [client messages]
   (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
@@ -49,6 +53,6 @@
 
 (defn nack-many
   ([client messages]
-   (nack-many client messages (constantly 0)))
-  ([client messages backoff-fn]
-   (change-visibility-batch client messages backoff-fn)))
+   (nack-many client messages {}))
+  ([client messages opts]
+   (change-visibility-batch client messages opts)))

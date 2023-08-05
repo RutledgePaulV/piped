@@ -73,11 +73,11 @@
            queue-url
            consumer-fn
            transform-fn
-           backoff-fn
            producer-parallelism
            consumer-parallelism
            acker-parallelism
            nacker-parallelism
+           nacker-opts
            blocking-consumers]
     :as   opts}]
 
@@ -109,8 +109,7 @@
                   pipe                 (async/chan)
                   acker-batched        (utils/deadline-batching acker-chan 10)
                   nacker-batched       (utils/interval-batching nacker-chan 5000 10)
-                  composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)
-                  backoff-fn           (if backoff-fn backoff-fn (constantly 0))]
+                  composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)]
 
               (letfn [(spawn-producer []
                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)}]
@@ -125,7 +124,7 @@
                         (actions/spawn-acker client acker-batched))
 
                       (spawn-nacker []
-                        (actions/spawn-nacker client nacker-batched backoff-fn))]
+                        (actions/spawn-nacker client nacker-batched nacker-opts))]
 
                 {:client         client
                  :acker-chan     acker-chan
