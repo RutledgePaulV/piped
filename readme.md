@@ -81,12 +81,6 @@ automatically chooses the number of sqs polling processes needed to saturate you
    ; things like the credentials provider
    :client-opts          {}
 
-   ; *optional* - defaults to {}
-   ; a map of possible configuration vars passed to nackers in case you need
-   ; customize things like how the VisibilityTimeout of nacked messages is
-   ; calculated
-   :nacker-opts          {:visibility-timeout-fn (fn [msg] (constantly 5))}
-
    ; *optional* - defaults to true
    ; whether to create dedicated threads for processing each message
    ; or if the processing should share the core.async dispatch thread

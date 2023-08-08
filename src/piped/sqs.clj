@@ -26,17 +26,14 @@
     (api.async/invoke client request)))
 
 (defn change-visibility-batch
-  ([client messages]
-   (change-visibility-batch client messages {}))
-  ([client messages {:keys [visibility-timeout-fn]
-                     :or   {visibility-timeout-fn (constantly 0)}}]
+  ([client messages visibility-timeout]
    (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
           (let [request {:op      :ChangeMessageVisibilityBatch
                          :request {:QueueUrl queue-url
-                                   :Entries  (for [{:keys [MessageId ReceiptHandle] :as message} messages]
+                                   :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
                                                {:Id                MessageId
                                                 :ReceiptHandle     ReceiptHandle
-                                                :VisibilityTimeout (visibility-timeout-fn message)})}}]
+                                                :VisibilityTimeout visibility-timeout})}}]
             (api.async/invoke client request)))
         (combine-batch-results))))
 
@@ -53,6 +50,4 @@
 
 (defn nack-many
   ([client messages]
-   (nack-many client messages {}))
-  ([client messages opts]
-   (change-visibility-batch client messages opts)))
+   (change-visibility-batch client messages 0)))
