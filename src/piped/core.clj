@@ -77,7 +77,6 @@
            consumer-parallelism
            acker-parallelism
            nacker-parallelism
-           nacker-opts
            blocking-consumers]
     :as   opts}]
 
@@ -124,7 +123,7 @@
                         (actions/spawn-acker client acker-batched))
 
                       (spawn-nacker []
-                        (actions/spawn-nacker client nacker-batched (or nacker-opts {})))]
+                        (actions/spawn-nacker client nacker-batched))]
 
                 {:client         client
                  :acker-chan     acker-chan
