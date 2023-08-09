@@ -1,8 +1,10 @@
 (ns piped.sqs
   "Functions relating to interacting with SQS."
-  (:require [cognitect.aws.client.api.async :as api.async]
-            [clojure.core.async :as async]
-            [piped.utils :as utils]))
+  (:require
+   [clojure.core.async :as async]
+   [clojure.tools.logging :as log]
+   [cognitect.aws.client.api.async :as api.async]
+   [piped.utils :as utils]))
 
 (defn- combine-batch-results [result-chans]
   (if (= 1 (count result-chans))
@@ -30,10 +32,13 @@
    (->> (for [[queue-url messages] (group-by utils/message->queue-url messages)]
           (let [request {:op      :ChangeMessageVisibilityBatch
                          :request {:QueueUrl queue-url
-                                   :Entries  (for [{:keys [MessageId ReceiptHandle]} messages]
+                                   :Entries  (for [{:keys [MessageId ReceiptHandle]
+                                                    :as   message} messages]
                                                {:Id                MessageId
                                                 :ReceiptHandle     ReceiptHandle
-                                                :VisibilityTimeout visibility-timeout})}}]
+                                                :VisibilityTimeout (or (:delay-seconds message)
+                                                                       visibility-timeout)})}}]
+            (log/info request)
             (api.async/invoke client request)))
         (combine-batch-results))))
 
