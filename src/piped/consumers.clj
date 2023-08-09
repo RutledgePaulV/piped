@@ -22,21 +22,26 @@
           (recur nil nil)
 
           :piped/action
-          (do
-            (log/info #(str "action here " %))
-            (when #(= % :ack)
-              (async/>! ack-chan msg))
-            (when #(= % :nack)
-              (async/>! nack-chan msg))
-            (recur nil nil))
+          (condp = result
+            :ack
+            (do
+              (async/>! ack-chan msg)
+              (recur nil nil))
+            :nack
+            (do
+              (async/>! nack-chan msg)
+              (recur nil nil)))
 
           :piped/action-map
-          (do
-            (when #(= (:action result) :ack)
-              (async/>! ack-chan (merge result msg)))
-            (when #(= (:action result) :nack)
-              (async/>! nack-chan (merge result msg)))
-            (recur nil nil))
+          (condp = (:action result)
+            :ack
+            (do
+              (async/>! ack-chan (merge result msg))
+              (recur nil nil))
+            :nack
+            (do
+              (async/>! nack-chan (merge result msg))
+              (recur nil nil)))
 
           :piped/extend
           (recur
