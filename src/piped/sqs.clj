@@ -2,7 +2,6 @@
   "Functions relating to interacting with SQS."
   (:require
    [clojure.core.async :as async]
-   [clojure.tools.logging :as log]
    [cognitect.aws.client.api.async :as api.async]
    [piped.utils :as utils]))
 
