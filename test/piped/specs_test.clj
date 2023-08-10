@@ -16,6 +16,12 @@
     (let [spec {:action :ack
                 :delay-seconds 5}]
       (is (s/valid? :piped/action-map spec))
+      (is (s/valid? :piped/action-map
+                    (assoc spec
+                           :action :nack)))
+      (is (s/valid? :piped/action-map
+                    (dissoc spec
+                            :delay-seconds)))
       (is (not (s/valid? :piped/action-map
                          (assoc spec
                                 :delay-seconds "a"))))
@@ -27,6 +33,4 @@
                                 :delay-seconds 1.13))))
       (is (not (s/valid? :piped/action-map
                          (assoc spec
-                                :action :do-something))))
-      (is (s/valid? :piped/action-map (assoc spec
-                                             :action :nack))))))
+                                :action :do-something)))))))
