@@ -135,7 +135,6 @@
                  :consumers      (doall (repeatedly consumer-parallelism spawn-consumer))
                  :ackers         (doall (repeatedly acker-parallelism spawn-acker))
                  :nackers        (doall (repeatedly nacker-parallelism spawn-nacker))})))]
-
     (let [state
           (atom (delay (launch)))
 
