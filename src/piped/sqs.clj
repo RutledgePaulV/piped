@@ -25,7 +25,6 @@
                  :request {:QueueUrl          (utils/message->queue-url message)
                            :ReceiptHandle     ReceiptHandle
                            :VisibilityTimeout visibility-timeout}}]
-    (log/info request)
     (api.async/invoke client request)))
 
 (defn change-visibility-batch
@@ -39,7 +38,6 @@
                                                 :ReceiptHandle     ReceiptHandle
                                                 :VisibilityTimeout (or (utils/message->timeout msg)
                                                                        visibility-timeout)})}}]
-            (log/info request)
             (api.async/invoke client request)))
         (combine-batch-results))))
 
