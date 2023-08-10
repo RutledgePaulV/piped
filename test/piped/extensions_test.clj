@@ -39,8 +39,7 @@
         messages   [{:value 1} {:value 2}]
         finished   (CountDownLatch. (count messages))
         consumer   (fn [{:keys [Body
-                                Attributes] :as msg}]
-                     (log/info "Received message" (pr-str msg))
+                                Attributes]}]
                      (condp = (:value Body)
                        1 (do (.countDown finished)
                              {:action :ack})
@@ -48,14 +47,10 @@
                                                 (get "ApproximateReceiveCount" "0")
                                                 (Integer/parseInt))]
                            (if (< attempts 3)
+                             {:action :nack :delay-seconds 4}
                              (do
-                               (log/info "nacking and delaying")
-                               {:action :nack :delay-seconds 4})
-                             (do
-                               (log/info "acking")
                                (.countDown finished)
                                {:action :ack})))))
-        _log (log/info queue-url)
         processor  (piped/processor
                     {:queue-url            queue-url
                      :client-opts          (support/localstack-client-opts)

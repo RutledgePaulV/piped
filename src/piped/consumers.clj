@@ -36,11 +36,13 @@
           (condp = (:action result)
             :ack
             (do
-              (async/>! ack-chan (merge result msg))
+              (async/>! ack-chan msg)
               (recur nil nil))
             :nack
             (do
-              (async/>! nack-chan (merge result msg))
+              (async/>! nack-chan (->> result
+                                       :delay-seconds
+                                       (utils/with-timeout msg)))
               (recur nil nil)))
 
           :piped/extend
