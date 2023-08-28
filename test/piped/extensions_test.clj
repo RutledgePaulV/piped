@@ -47,7 +47,7 @@
                                                 (get "ApproximateReceiveCount" "0")
                                                 (Integer/parseInt))]
                            (if (< attempts 3)
-                             {:action :nack :delay-seconds 4}
+                             {:action :nack :delay-seconds (rand-int 2)}
                              (do
                                (.countDown finished)
                                {:action :ack})))))
