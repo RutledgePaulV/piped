@@ -109,6 +109,7 @@
              (if (and max (= max (count new-batch)))
                (when (async/>! return (vals new-batch))
                  (recur (async/timeout msecs) {}))
+               ;; Continue accumulating with deadline.
                (recur deadline new-batch))))
          (do (when (not-empty batch)
                (async/>! return (vals batch)))
