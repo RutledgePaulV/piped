@@ -71,16 +71,18 @@
         (when (async/>! return (vals batch))
           (recur [chan] {}))
         (if-some [[value port] (async/alts! channels :priority true)]
-          ;; Drew from deadline.
+          ;; Drew from a deadline.
           (if-not (identical? port chan)
             (if (seq batch)
               (when (async/>! return (vals batch))
                 (recur [chan] {}))
               (recur [chan] {}))
             (if (some? value)
-              (if-some [deadline (message->deadline value)]
-                (recur (conj channels deadline) (assoc batch (message->identifier value) value))
-                (recur channels (assoc batch (message->identifier value) value)))
+              (let [identifier (message->identifier value)
+                    new-batch  (assoc batch identifier value)]
+                (if-some [deadline (message->deadline value)]
+                  (recur (conj channels deadline) new-batch)
+                  (recur channels new-batch)))
               (do (when (seq batch)
                     (async/>! return (vals batch)))
                   (async/close! return)))))))
