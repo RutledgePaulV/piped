@@ -22,7 +22,7 @@
           (recur nil nil)
 
           :piped/action
-          (condp = result
+          (case result
             :ack
             (do
               (async/>! ack-chan msg)
@@ -33,7 +33,7 @@
               (recur nil nil)))
 
           :piped/action-map
-          (condp = (:action result)
+          (case (:action result)
             :ack
             (do
               (async/>! ack-chan msg)
@@ -79,10 +79,10 @@
                          (if (utils/channel? result)
                            (recur (async/<! result))
                            (cond
-                             (contains? #{:ack :nack} result)
+                             (#{:ack :nack} result)
                              result
 
-                             (contains? #{:ack :nack} (:action result))
+                             (#{:ack :nack} (:action result))
                              result
 
                              :else
@@ -110,10 +110,10 @@
                          (if (utils/channel? result)
                            (recur (async/<!! result))
                            (cond
-                             (contains? #{:ack :nack} result)
+                             (#{:ack :nack} result)
                              result
 
-                             (contains? #{:ack :nack} (:action result))
+                             (#{:ack :nack} (:action result))
                              result
 
                              :else
