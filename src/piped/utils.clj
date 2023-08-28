@@ -116,6 +116,47 @@
              (async/close! return))))
      return)))
 
+(defn combo-batching
+  ([chan msecs]
+   (combo-batching chan msecs nil))
+  ([chan msecs max]
+   (let [return (async/chan)]
+     (async/go-loop [channels [chan (async/timeout msecs)]
+                     batch    {}]
+       (if (= max (count batch))
+         (when (async/>! return (vals batch))
+           ;; Reset after batch is sent.
+           (recur [chan (async/timeout msecs)] {}))
+         (if-some [[value port] (async/alts!
+                                 channels
+                                 :priority true)]
+           ;; Drew from a deadline.
+           (if-not (identical? port chan)
+             (if (seq batch)
+               (when (async/>! return (vals batch))
+                 ;; Reset after batch sent.
+                 (recur [chan (async/timeout msecs)] {}))
+               ;; No batch but reset the deadlines.
+               (recur [chan (async/timeout msecs)] {}))
+             (if (some? value)
+               (let [identifier (message->identifier value)
+                     timeout    (message->timeout value)
+                     deadline   (message->deadline value)
+                     new-batch  (assoc batch identifier value)]
+                 ;; Message has a non-zero VisibilityTimeout, so
+                 ;; it needs to be :nacked before the deadline or
+                 ;; that non-zero timeout will reset to 0.
+                 (if (and timeout deadline)
+                   ;; Accumulate and track the new deadline.
+                   (recur (conj channels deadline) new-batch)
+                   ;; Continue accumulating with existing deadlines.
+                   (recur channels new-batch)))
+               (do
+                 (when (seq batch)
+                   (async/>! return (vals batch)))
+                 (async/close! return)))))))
+     return)))
+
 (defmacro defmulti*
   "Like clojure.core/defmulti, but actually updates the dispatch value when you reload it."
   [symbol dispatch-fn]
