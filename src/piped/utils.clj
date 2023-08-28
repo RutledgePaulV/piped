@@ -54,18 +54,16 @@
   ([] (backoff-seq 60000))
   ([max]
    (->>
-     (lazy-cat
-       (->> (cons 0 (iterate (partial * 2) 1000))
-            (take-while #(< % max)))
-       (repeat max))
-     (map (fn [x] (+ x (rand-int 1000)))))))
+    (lazy-cat
+     (->> (cons 0 (iterate (partial * 2) 1000))
+          (take-while #(< % max)))
+     (repeat max))
+    (map (fn [x] (+ x (rand-int 1000)))))))
 
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
    the max batch size is reached or one of the messages in the batch has become 'due'
-   for action. deadline-fn is a function of a message that returns a channel that
-   closes when the message is 'due'. deadline-fn may return nil if a message has no
-   particular urgency."
+   for action."
   [chan max]
   (let [return (async/chan)]
     (async/go-loop [channels [chan] batch {}]
@@ -73,6 +71,7 @@
         (when (async/>! return (vals batch))
           (recur [chan] {}))
         (if-some [[value port] (async/alts! channels :priority true)]
+          ;; Drew from deadline.
           (if-not (identical? port chan)
             (if (seq batch)
               (when (async/>! return (vals batch))
@@ -93,8 +92,11 @@
    (interval-batching chan msecs nil))
   ([chan msecs max]
    (let [return (async/chan)]
-     (async/go-loop [deadline (async/timeout msecs) batch {}]
-       (if-some [result (async/alt! [chan] ([v] v) [deadline] ::timeout :priority true)]
+     (async/go-loop [deadline (async/timeout msecs)
+                     batch {}]
+       (if-some [result (async/alt! [chan] ([v] v)
+                                    [deadline] ::timeout
+                                    :priority true)]
          (case result
            ::timeout
            (if (empty? batch)
@@ -103,7 +105,7 @@
                (recur (async/timeout msecs) {})))
            (let [new-batch (assoc batch (message->identifier result) result)]
              (if (and max (= max (count new-batch)))
-               (when (async/>! return (vals batch))
+               (when (async/>! return (vals new-batch))
                  (recur (async/timeout msecs) {}))
                (recur deadline new-batch))))
          (do (when (not-empty batch)
