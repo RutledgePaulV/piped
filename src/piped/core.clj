@@ -107,7 +107,7 @@
                   nacker-chan          (async/chan)
                   pipe                 (async/chan)
                   acker-batched        (utils/deadline-batching acker-chan 10)
-                  nacker-batched       (utils/interval-batching nacker-chan 5000 10)
+                  nacker-batched       (utils/combo-batching nacker-chan 5000 10)
                   composed-consumer    (if transform-fn (comp consumer-fn transform-fn) consumer-fn)]
 
               (letfn [(spawn-producer []

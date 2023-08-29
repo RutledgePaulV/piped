@@ -1,8 +1,10 @@
 (ns piped.utils
   "Utility functions."
-  (:require [clojure.core.async :as async])
-  (:import [clojure.core.async.impl.channels ManyToManyChannel]
-           [java.util UUID]))
+  (:require
+   [clojure.core.async :as async])
+  (:import
+   [clojure.core.async.impl.channels ManyToManyChannel]
+   [java.util UUID]))
 
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
@@ -134,9 +136,9 @@
            (if-not (identical? port chan)
              (if (seq batch)
                (when (async/>! return (vals batch))
-                 ;; Reset after batch sent.
+                   ;; Reset after batch sent.
                  (recur [chan (async/timeout msecs)] {}))
-               ;; No batch but reset the deadlines.
+                 ;; No batch but reset the deadlines.
                (recur [chan (async/timeout msecs)] {}))
              (if (some? value)
                (let [identifier (message->identifier value)
@@ -148,7 +150,9 @@
                  ;; that non-zero timeout will reset to 0.
                  (if (and timeout deadline)
                    ;; Accumulate and track the new deadline.
-                   (recur (conj channels deadline) new-batch)
+                   ;; Set deadline before the other channels to ensure
+                   ;; it receives priority over the generic message chan.
+                   (recur (cons deadline channels) new-batch)
                    ;; Continue accumulating with existing deadlines.
                    (recur channels new-batch)))
                (do
