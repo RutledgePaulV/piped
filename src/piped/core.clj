@@ -9,7 +9,6 @@
             [cognitect.aws.http :as http]
             [cognitect.http-client :as impl]
             [piped.specs :as specs]
-            [aws-api-credential-providers.core :as cp]
             [clojure.tools.logging :as log]))
 
 (defprotocol PipedProcessor
@@ -90,15 +89,11 @@
                   nacker-parallelism   (or nacker-parallelism producer-parallelism)
                   max-http-ops         (+ producer-parallelism acker-parallelism nacker-parallelism)
                   http-client          (delay (http-client
-                                               {:pending-ops-limit               max-http-ops
-                                                :max-connections-per-destination max-http-ops}))
-                  credentials-provider (delay (cp/default-credentials-provider
-                                               (or (:http-client client-opts) (force http-client))))
+                                                {:pending-ops-limit               max-http-ops
+                                                 :max-connections-per-destination max-http-ops}))
                   client               (cond-> (or client-opts {})
                                          (not (contains? client-opts :http-client))
                                          (assoc :http-client (force http-client))
-                                         (not (contains? client-opts :credentials-provider))
-                                         (assoc :credentials-provider (force credentials-provider))
                                          :always
                                          (assoc :api :sqs)
                                          :always
@@ -140,34 +135,34 @@
 
           shutdown-thread
           (Thread.
-           ^Runnable
-           (fn []
-             (when (realized? (deref state))
-               (log/debugf "Processor shutdown for %s initiated." queue-url)
-               (let [{:keys [pipe
-                             acker-chan
-                             nacker-chan
-                             producers
-                             consumers
-                             ackers
-                             nackers
-                             client]} (force (deref state))]
-                 (log/debugf "Signaling producers and consumers to exit for %s processor." queue-url)
-                 (async/close! pipe)
-                 (run! async/<!! producers)
-                 (log/debugf "Producers have exited for %s processor." queue-url)
-                 (run! async/<!! consumers)
-                 (log/debugf "Consumers have exited for %s processor." queue-url)
-                 (log/debugf "Signaling ackers to exit for %s processor." queue-url)
-                 (async/close! acker-chan)
-                 (run! async/<!! ackers)
-                 (log/debugf "Ackers have exited for %s processor." queue-url)
-                 (log/debugf "Signaling nackers to exit for %s processor." queue-url)
-                 (async/close! nacker-chan)
-                 (run! async/<!! nackers)
-                 (log/debugf "Nackers have exited for %s processor." queue-url)
-                 (aws/stop client)
-                 (log/debugf "Processor shutdown for %s finished." queue-url)))))
+            ^Runnable
+            (fn []
+              (when (realized? (deref state))
+                (log/debugf "Processor shutdown for %s initiated." queue-url)
+                (let [{:keys [pipe
+                              acker-chan
+                              nacker-chan
+                              producers
+                              consumers
+                              ackers
+                              nackers
+                              client]} (force (deref state))]
+                  (log/debugf "Signaling producers and consumers to exit for %s processor." queue-url)
+                  (async/close! pipe)
+                  (run! async/<!! producers)
+                  (log/debugf "Producers have exited for %s processor." queue-url)
+                  (run! async/<!! consumers)
+                  (log/debugf "Consumers have exited for %s processor." queue-url)
+                  (log/debugf "Signaling ackers to exit for %s processor." queue-url)
+                  (async/close! acker-chan)
+                  (run! async/<!! ackers)
+                  (log/debugf "Ackers have exited for %s processor." queue-url)
+                  (log/debugf "Signaling nackers to exit for %s processor." queue-url)
+                  (async/close! nacker-chan)
+                  (run! async/<!! nackers)
+                  (log/debugf "Nackers have exited for %s processor." queue-url)
+                  (aws/stop client)
+                  (log/debugf "Processor shutdown for %s finished." queue-url)))))
 
           system
           (reify PipedProcessor
