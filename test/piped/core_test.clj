@@ -1,8 +1,9 @@
 (ns piped.core-test
-  (:require [clojure.test :refer :all]
-            [piped.core :refer :all]
-            [clojure.edn :as edn]
-            [piped.support :as support]))
+  (:require
+   [clojure.edn :as edn]
+   [clojure.test :refer :all]
+   [piped.core :refer :all]
+   [piped.support :as support]))
 
 (use-fixtures :each (fn [tests] (stop-all-processors!) (tests) (stop-all-processors!)))
 
@@ -14,10 +15,10 @@
         received   (promise)
         consumer   (fn [message] (deliver received message))
         system     (start (processor
-                            {:consumer-fn  consumer
-                             :queue-url    queue-url
-                             :client-opts  (support/localstack-client-opts)
-                             :transform-fn transform}))
+                           {:consumer-fn  consumer
+                            :queue-url    queue-url
+                            :client-opts  (support/localstack-client-opts)
+                            :transform-fn transform}))
         data       {:value 1}]
     (try
       (support/send-message queue-url data)

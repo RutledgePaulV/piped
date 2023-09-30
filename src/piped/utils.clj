@@ -1,8 +1,10 @@
 (ns piped.utils
   "Utility functions."
-  (:require [clojure.core.async :as async])
-  (:import [clojure.core.async.impl.channels ManyToManyChannel]
-           [java.util UUID]))
+  (:require
+   [clojure.core.async :as async])
+  (:import
+   [clojure.core.async.impl.channels ManyToManyChannel]
+   [java.util UUID]))
 
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
@@ -54,18 +56,16 @@
   ([] (backoff-seq 60000))
   ([max]
    (->>
-     (lazy-cat
-       (->> (cons 0 (iterate (partial * 2) 1000))
-            (take-while #(< % max)))
-       (repeat max))
-     (map (fn [x] (+ x (rand-int 1000)))))))
+    (lazy-cat
+     (->> (cons 0 (iterate (partial * 2) 1000))
+          (take-while #(< % max)))
+     (repeat max))
+    (map (fn [x] (+ x (rand-int 1000)))))))
 
 (defn deadline-batching
   "Batches messages from chan and emits the most recently accumulated batch whenever
    the max batch size is reached or one of the messages in the batch has become 'due'
-   for action. deadline-fn is a function of a message that returns a channel that
-   closes when the message is 'due'. deadline-fn may return nil if a message has no
-   particular urgency."
+   for action."
   [chan max]
   (let [return (async/chan)]
     (async/go-loop [channels [chan] batch {}]
@@ -73,15 +73,18 @@
         (when (async/>! return (vals batch))
           (recur [chan] {}))
         (if-some [[value port] (async/alts! channels :priority true)]
+          ;; Drew from a deadline.
           (if-not (identical? port chan)
             (if (seq batch)
               (when (async/>! return (vals batch))
                 (recur [chan] {}))
               (recur [chan] {}))
             (if (some? value)
-              (if-some [deadline (message->deadline value)]
-                (recur (conj channels deadline) (assoc batch (message->identifier value) value))
-                (recur channels (assoc batch (message->identifier value) value)))
+              (let [identifier (message->identifier value)
+                    new-batch  (assoc batch identifier value)]
+                (if-some [deadline (message->deadline value)]
+                  (recur (conj channels deadline) new-batch)
+                  (recur channels new-batch)))
               (do (when (seq batch)
                     (async/>! return (vals batch)))
                   (async/close! return)))))))
@@ -93,8 +96,11 @@
    (interval-batching chan msecs nil))
   ([chan msecs max]
    (let [return (async/chan)]
-     (async/go-loop [deadline (async/timeout msecs) batch {}]
-       (if-some [result (async/alt! [chan] ([v] v) [deadline] ::timeout :priority true)]
+     (async/go-loop [deadline (async/timeout msecs)
+                     batch {}]
+       (if-some [result (async/alt! [chan] ([v] v)
+                                    [deadline] ::timeout
+                                    :priority true)]
          (case result
            ::timeout
            (if (empty? batch)
@@ -103,12 +109,56 @@
                (recur (async/timeout msecs) {})))
            (let [new-batch (assoc batch (message->identifier result) result)]
              (if (and max (= max (count new-batch)))
-               (when (async/>! return (vals batch))
+               (when (async/>! return (vals new-batch))
                  (recur (async/timeout msecs) {}))
+               ;; Continue accumulating with deadline.
                (recur deadline new-batch))))
          (do (when (not-empty batch)
                (async/>! return (vals batch)))
              (async/close! return))))
+     return)))
+
+(defn combo-batching
+  ([chan msecs]
+   (combo-batching chan msecs nil))
+  ([chan msecs max]
+   (let [return (async/chan)]
+     (async/go-loop [channels [chan (async/timeout msecs)]
+                     batch    {}]
+       (if (= max (count batch))
+         (when (async/>! return (vals batch))
+           ;; Reset after batch is sent.
+           (recur [chan (async/timeout msecs)] {}))
+         (if-some [[value port] (async/alts!
+                                 channels
+                                 :priority true)]
+           ;; Drew from a deadline.
+           (if-not (identical? port chan)
+             (if (seq batch)
+               (when (async/>! return (vals batch))
+                   ;; Reset after batch sent.
+                 (recur [chan (async/timeout msecs)] {}))
+                 ;; No batch but reset the deadlines.
+               (recur [chan (async/timeout msecs)] {}))
+             (if (some? value)
+               (let [identifier (message->identifier value)
+                     timeout    (message->timeout value)
+                     deadline   (message->deadline value)
+                     new-batch  (assoc batch identifier value)]
+                 ;; Message has a non-zero VisibilityTimeout, so
+                 ;; it needs to be :nacked before the deadline or
+                 ;; that non-zero timeout will reset to 0.
+                 (if (and timeout deadline)
+                   ;; Accumulate and track the new deadline.
+                   ;; Set deadline before the other channels to ensure
+                   ;; it receives priority over the generic message chan.
+                   (recur (cons deadline channels) new-batch)
+                   ;; Continue accumulating with existing deadlines.
+                   (recur channels new-batch)))
+               (do
+                 (when (seq batch)
+                   (async/>! return (vals batch)))
+                 (async/close! return)))))))
      return)))
 
 (defmacro defmulti*

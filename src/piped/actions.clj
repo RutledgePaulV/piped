@@ -23,4 +23,3 @@
         (when (utils/anomaly? response)
           (log/error "Error when trying to nack batch of messages." (pr-str response))))
       (recur))))
-

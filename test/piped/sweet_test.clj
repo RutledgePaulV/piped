@@ -33,4 +33,3 @@
   (piped/start #'my-processor)
 
   (piped/stop #'my-processor))
-
