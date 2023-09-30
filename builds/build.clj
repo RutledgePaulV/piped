@@ -19,6 +19,7 @@
                 :version   version
                 :basis     basis
                 :src-dirs  ["src"]
+                :src-pom   "builds/pom-template.xml"
                 :scm       {:tag        (str "v" version)
                             :connection (str "scm:git:git@github.com:rutledgepaulv/" (name lib) ".git")
                             :url        (str "https://github.com/rutledgepaulv/" (name lib))}})

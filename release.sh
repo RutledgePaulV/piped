@@ -16,5 +16,5 @@ op run -- mvn deploy:deploy-file \
   -DrepositoryId="clojars" \
   -Durl="https://repo.clojars.org"
 
-git tag "v$version"
-git push origin "refs/tags/v$version"
+#git tag "v$version"
+#git push origin "refs/tags/v$version"
