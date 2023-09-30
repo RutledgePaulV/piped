@@ -11,11 +11,11 @@
 (s/def :piped/message map?)
 (s/def :piped/action #{:ack :nack})
 (s/def :piped/extend #{:extend})
-(s/def :piped/delay nat-int?)
+(s/def :piped/delay-seconds nat-int?)
 (s/def :piped/action-map
   (s/keys
     :req-un [:piped/action]
-    :opt-un [:piped/delay]))
+    :opt-un [:piped/delay-seconds]))
 
 (s/def :piped/consumer-fn ifn?)
 (s/def :piped/transform-fn ifn?)

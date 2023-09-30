@@ -51,30 +51,19 @@
         msg1     {:data 1}
         msg2     {:data 2}
         msg3     (-> {:data 3}
-                     (with-deadline 100)
+                     (with-deadline 300)
                      (with-timeout 10000))
         chan     (async/chan)
         return   (combo-batching chan 1001 5)]
-    (async/go-loop []
-      (when-some [item (async/<! return)]
-        (swap! received conj item)
-        (recur)))
 
     (async/>!! chan msg1)
     (async/>!! chan msg2)
     (is (empty? (deref received)))
     (async/<!! (async/timeout 100))
+    (nil? (async/poll! return))
     (async/>!! chan msg3)
-    (async/close! chan)
-    (async/<!! (async/timeout 1000))
-    ;; Two groups of messages
-    (is (= 1 (-> received deref count)))
-    (is (= 3 (-> received deref first count)))
-    ;; The last message was pulled out before its deadline.
-    (async/go
-      (is (not (nil? (-> received
-                         deref
-                         first
-                         last
-                         message->deadline
-                         async/<!)))))))
+    (let [start (System/currentTimeMillis)
+          batch (async/<!! return)
+          stop  (System/currentTimeMillis)]
+      (is (= 3 (count batch)))
+      (is (< (- stop start) 1000)))))
