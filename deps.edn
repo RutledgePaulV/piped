@@ -1,0 +1,25 @@
+{:paths ["src" "resources"]
+
+ :deps  {org.clojure/clojure         {:mvn/version "1.11.1"}
+         com.cognitect.aws/api       {:mvn/version "0.8.686"}
+         com.cognitect.aws/endpoints {:mvn/version "1.1.12.504"}
+         com.cognitect.aws/sqs       {:mvn/version "847.2.1398.0"}
+         org.clojure/core.async      {:mvn/version "1.6.681"}
+         org.clojure/tools.logging   {:mvn/version "1.2.4"}}
+
+ :aliases
+ {:build     {:extra-deps  {io.github.clojure/tools.build
+                            {:git/url "https://github.com/clojure/tools.build.git"
+                             :sha     "32d497f4f1ad07cb1dfa0855ada9e9cf17abff48"}}
+              :extra-paths ["builds"]
+              :ns-default  build}
+
+  :test      {:extra-paths ["test"]
+              :extra-deps  {org.testcontainers/testcontainers {:mvn/version "1.19.0"}
+                            org.slf4j/slf4j-simple            {:mvn/version "2.0.9"}}}
+
+  :run-tests {:extra-deps {io.github.cognitect-labs/test-runner
+                           {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                            :git/sha "7284cda41fb9edc0f3bc6b6185cfb7138fc8a023"}}
+              :main-opts  ["-m" "cognitect.test-runner"]
+              :exec-fn    cognitect.test-runner.api/test}}}

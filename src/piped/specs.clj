@@ -11,8 +11,12 @@
 (s/def :piped/message map?)
 (s/def :piped/action #{:ack :nack})
 (s/def :piped/extend #{:extend})
-(s/def :piped/action-map (s/map-of #{:action :delay-seconds} #(or (s/valid? :piped/action %)
-                                                                  (nat-int? %))))
+(s/def :piped/delay nat-int?)
+(s/def :piped/action-map
+  (s/keys
+    :req-un [:piped/action]
+    :opt-un [:piped/delay]))
+
 (s/def :piped/consumer-fn ifn?)
 (s/def :piped/transform-fn ifn?)
 (s/def :piped/system any?)

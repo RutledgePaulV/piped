@@ -9,10 +9,10 @@
 
 (defonce localstack
   (delay
-    (let [container (GenericContainer. "localstack/localstack:0.10.9")]
+    (let [container (GenericContainer. "localstack/localstack:2.3.1")]
       (doto container
-        (.setExposedPorts [(int 4576)])
-        (.setEnv ["SERVICES=sqs" (str "HOSTNAME_EXTERNAL=" (.getContainerIpAddress container))])
+        (.setExposedPorts [(int 4566)])
+        (.setEnv ["SERVICES=sqs" (str "LOCALSTACK_HOST=" (.getContainerIpAddress container))])
         (.withStartupTimeout (Duration/ofMinutes 1))
         (.waitingFor (Wait/forLogMessage "^Ready\\.\\s*$" 1))
         (.start))
@@ -28,7 +28,7 @@
    :endpoint-override
            {:protocol :http
             :hostname (.getContainerIpAddress @localstack)
-            :port     (.getMappedPort @localstack 4576)}})
+            :port     (.getMappedPort @localstack 4566)}})
 
 (def client
   (delay (aws/client (localstack-client-opts))))
