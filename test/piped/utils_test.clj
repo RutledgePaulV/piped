@@ -66,4 +66,4 @@
           batch (async/<!! return)
           stop  (System/currentTimeMillis)]
       (is (= 3 (count batch)))
-      (is (< (- stop start) 1000)))))
+      (is (< (- stop start) 600)))))
