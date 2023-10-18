@@ -2,7 +2,7 @@
   (:require [clojure.tools.build.api :as b]))
 
 (def lib 'org.clojars.rutledgepaulv/piped)
-(def version "0.1.8")
+(def version "0.1.9")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 (def jar-file (format "target/piped.jar" (name lib) version))
@@ -19,7 +19,10 @@
                 :version   version
                 :basis     basis
                 :src-dirs  ["src"]
-                :src-pom   "builds/pom-template.xml"
+                :pom-data  [[:licenses
+                             [:license
+                              [:name "MIT"]
+                              [:url "https://opensource.org/license/mit/"]]]]
                 :scm       {:tag        (str "v" version)
                             :connection (str "scm:git:git@github.com:rutledgepaulv/" (name lib) ".git")
                             :url        (str "https://github.com/rutledgepaulv/" (name lib))}})

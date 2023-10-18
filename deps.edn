@@ -10,12 +10,12 @@
  :aliases
  {:build     {:extra-deps  {io.github.clojure/tools.build
                             {:git/url "https://github.com/clojure/tools.build.git"
-                             :sha     "32d497f4f1ad07cb1dfa0855ada9e9cf17abff48"}}
+                             :sha     "cc1e33d003e2e9507e8e6e899611f56172dacc0a"}}
               :extra-paths ["builds"]
               :ns-default  build}
 
   :test      {:extra-paths ["test"]
-              :extra-deps  {org.testcontainers/testcontainers {:mvn/version "1.19.0"}
+              :extra-deps  {org.testcontainers/testcontainers {:mvn/version "1.19.1"}
                             org.slf4j/slf4j-simple            {:mvn/version "2.0.9"}}}
 
   :run-tests {:extra-deps {io.github.cognitect-labs/test-runner

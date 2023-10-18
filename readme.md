@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/rutledgepaulv/piped.svg?branch=master)](https://travis-ci.com/rutledgepaulv/piped)
+![Build](https://github.com/rutledgepaulv/piped/actions/workflows/check/badge.svg?branch=master)
 [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.rutledgepaulv/piped.svg)](https://clojars.org/org.clojars.rutledgepaulv/piped)
 
 <img src="./docs/ready-hans.jpg" title="harmonic labyrinth" width="300" height="300" align="left" padding="5px"/>
