@@ -55,7 +55,9 @@
              (if (utils/anomaly? response)
                (log/error "Error extending visibility timeout of inflight message." (pr-str response))
                (log/infof "Extended visibility for inflight message %s in queue %s from %d to %d seconds." message-id queue-url old-timeout new-timeout))
-             (-> msg (utils/with-deadline (* new-timeout 1000)) (utils/with-timeout new-timeout)))
+             (-> msg
+                 (utils/with-deadline (- (* new-timeout 1000) utils/buffer-millis))
+                 (utils/with-timeout new-timeout)))
            task))))))
 
 (defn spawn-consumer-async

@@ -9,7 +9,6 @@
 (def min-receive 1)
 (def max-receive 10)
 (def max-wait 20)
-(def buffer-millis 2000)
 (def initial-timeout 30)
 
 (defn spawn-producer
@@ -41,7 +40,7 @@
            (get response :Messages [])
 
            deadline
-           (async/timeout (- (* VisibilityTimeout 1000) buffer-millis))
+           (async/timeout (- (* VisibilityTimeout 1000) utils/buffer-millis))
 
            metadata
            {:deadline deadline :queue-url queue-url :timeout VisibilityTimeout}

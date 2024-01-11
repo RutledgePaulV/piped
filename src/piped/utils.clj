@@ -6,6 +6,8 @@
    [clojure.core.async.impl.channels ManyToManyChannel]
    [java.util UUID]))
 
+(def buffer-millis 2000)
+
 (defn message->queue-url [message]
   (some-> message meta :queue-url))
 
