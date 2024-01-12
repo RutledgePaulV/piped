@@ -77,7 +77,7 @@
            acker-parallelism
            nacker-parallelism
            blocking-consumers
-           queue-visibility-timeout]
+           queue-visibility-timeout-seconds]
     :as   opts}]
 
   (specs/assert-options opts)
@@ -108,7 +108,7 @@
 
               (letfn [(spawn-producer []
                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)
-                                    :VisibilityTimeout   (or queue-visibility-timeout
+                                    :VisibilityTimeout   (or queue-visibility-timeout-seconds
                                                              producers/initial-timeout)}]
                           (producers/spawn-producer client queue-url pipe nacker-chan opts)))
 

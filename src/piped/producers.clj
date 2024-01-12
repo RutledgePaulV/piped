@@ -9,7 +9,7 @@
 (def min-receive 1)
 (def max-receive 10)
 (def max-wait 20)
-(def initial-timeout 30)
+(def initial-timeout-seconds 30)
 
 (defn spawn-producer
   ([client queue-url output-chan nack-chan]
@@ -17,7 +17,7 @@
 
   ([client queue-url output-chan nack-chan
     {:keys [MaxNumberOfMessages VisibilityTimeout]
-     :or   {MaxNumberOfMessages max-receive VisibilityTimeout initial-timeout}}]
+     :or   {MaxNumberOfMessages max-receive VisibilityTimeout initial-timeout-seconds}}]
 
    (async/go-loop [max-number-of-messages MaxNumberOfMessages backoff-seq []]
 
