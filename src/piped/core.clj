@@ -109,7 +109,7 @@
               (letfn [(spawn-producer []
                         (let [opts {:MaxNumberOfMessages (min 10 consumer-parallelism)
                                     :VisibilityTimeout   (or queue-visibility-timeout-seconds
-                                                             producers/initial-timeout)}]
+                                                             producers/initial-timeout-seconds)}]
                           (producers/spawn-producer client queue-url pipe nacker-chan opts)))
 
                       (spawn-consumer []
