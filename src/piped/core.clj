@@ -6,8 +6,6 @@
             [piped.actions :as actions]
             [piped.utils :as utils]
             [cognitect.aws.client.api :as aws]
-            [cognitect.aws.http :as http]
-            [cognitect.http-client :as impl]
             [piped.specs :as specs]
             [clojure.tools.logging :as log]))
 
@@ -52,16 +50,6 @@
   []
   (run! deref (doall (map #(future (stop %)) (get-all-processors)))))
 
-(defn http-client
-  "Returns a http client using cognitect's async jetty client wrapper."
-  [http-opts]
-  (let [c (impl/create http-opts)]
-    (reify http/HttpClient
-      (-submit [_ request channel]
-        (impl/submit c request channel))
-      (-stop [_]
-        (impl/stop c)))))
-
 (defn processor
   "Spawns a set of producers and consumers for a given queue.
 
@@ -88,13 +76,7 @@
                   producer-parallelism (or producer-parallelism (utils/quot+ consumer-parallelism 10))
                   acker-parallelism    (or acker-parallelism producer-parallelism)
                   nacker-parallelism   (or nacker-parallelism producer-parallelism)
-                  max-http-ops         (+ producer-parallelism acker-parallelism nacker-parallelism)
-                  http-client          (delay (http-client
-                                                {:pending-ops-limit               max-http-ops
-                                                 :max-connections-per-destination max-http-ops}))
                   client               (cond-> (or client-opts {})
-                                         (not (contains? client-opts :http-client))
-                                         (assoc :http-client (force http-client))
                                          :always
                                          (assoc :api :sqs)
                                          :always
